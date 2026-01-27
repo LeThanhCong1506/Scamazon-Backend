@@ -25,6 +25,13 @@ public partial class ChatMessage
 
     public DateTime? CreatedAt { get; set; }
 
+    /// <summary>
+    /// ID của admin trả lời tin nhắn (nếu is_from_store = true)
+    /// </summary>
+    public int? AdminId { get; set; }
+
+    public virtual User? Admin { get; set; }
+
     public virtual ChatRoom ChatRoom { get; set; } = null!;
 
     public virtual Product? Product { get; set; }

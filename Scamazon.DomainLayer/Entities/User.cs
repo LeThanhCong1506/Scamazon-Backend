@@ -36,9 +36,18 @@ public partial class User
 
     public DateTime? UpdatedAt { get; set; }
 
+    /// <summary>
+    /// Phân quyền: customer = khách hàng, admin = quản trị viên
+    /// </summary>
+    public string? Role { get; set; }
+
+    public virtual ICollection<AdminActivityLog> AdminActivityLogs { get; set; } = new List<AdminActivityLog>();
+
     public virtual Cart? Cart { get; set; }
 
-    public virtual ICollection<ChatMessage> ChatMessages { get; set; } = new List<ChatMessage>();
+    public virtual ICollection<ChatMessage> ChatMessageAdmins { get; set; } = new List<ChatMessage>();
+
+    public virtual ICollection<ChatMessage> ChatMessageSenders { get; set; } = new List<ChatMessage>();
 
     public virtual ICollection<ChatRoom> ChatRooms { get; set; } = new List<ChatRoom>();
 
