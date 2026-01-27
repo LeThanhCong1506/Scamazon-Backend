@@ -31,4 +31,24 @@ public interface IUserRepository
     /// Lấy user theo id
     /// </summary>
     Task<User?> GetByIdAsync(int id);
+
+    /// <summary>
+    /// Thêm admin activity log
+    /// </summary>
+    Task AddAdminActivityLogAsync(AdminActivityLog log);
+
+    /// <summary>
+    /// Lưu FCM token cho user
+    /// </summary>
+    Task SaveDeviceTokenAsync(int userId, string token, string? deviceType);
+
+    /// <summary>
+    /// Xóa FCM token
+    /// </summary>
+    Task RemoveDeviceTokenAsync(int userId, string token);
+
+    /// <summary>
+    /// Xóa tất cả FCM token của user
+    /// </summary>
+    Task RemoveAllDeviceTokensAsync(int userId);
 }

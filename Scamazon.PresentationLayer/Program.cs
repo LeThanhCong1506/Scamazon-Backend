@@ -52,6 +52,36 @@ namespace MV.PresentationLayer
                     ValidAudience = jwtSettings["Audience"] ?? "ScamazonApp",
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
                 };
+
+                // Custom response khi token không hợp lệ hoặc thiếu
+                options.Events = new JwtBearerEvents
+                {
+                    OnChallenge = context =>
+                    {
+                        context.HandleResponse();
+                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        context.Response.ContentType = "application/json";
+
+                        var message = string.IsNullOrEmpty(context.Error)
+                            ? "Token required"
+                            : "Invalid token";
+
+                        return context.Response.WriteAsync(
+                            System.Text.Json.JsonSerializer.Serialize(new
+                            {
+                                success = false,
+                                message = message
+                            }));
+                    },
+                    OnAuthenticationFailed = context =>
+                    {
+                        if (context.Exception is SecurityTokenExpiredException)
+                        {
+                            context.Response.Headers.Append("Token-Expired", "true");
+                        }
+                        return Task.CompletedTask;
+                    }
+                };
             });
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

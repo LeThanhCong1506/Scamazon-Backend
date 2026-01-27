@@ -100,10 +100,120 @@ public class AuthService : IAuthService
                     Email = createdUser.Email,
                     Phone = createdUser.Phone,
                     FullName = createdUser.FullName,
+                    Role = createdUser.Role,
+                    AvatarUrl = createdUser.AvatarUrl,
                     CreatedAt = createdUser.CreatedAt
                 },
                 Token = token
             }
+        };
+    }
+
+    /// <summary>
+    /// Đăng nhập
+    /// </summary>
+    public async Task<AuthResponseDto> LoginAsync(LoginRequestDto request, string? ipAddress)
+    {
+        // 1. Tìm user theo username
+        var user = await _userRepository.GetByUsernameAsync(request.Username);
+
+        if (user == null)
+        {
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = "Username hoặc mật khẩu không đúng"
+            };
+        }
+
+        // 2. Verify password với bcrypt
+        if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+        {
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = "Username hoặc mật khẩu không đúng"
+            };
+        }
+
+        // 3. Check is_active = true
+        if (user.IsActive != true)
+        {
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = "Tài khoản đã bị vô hiệu hóa"
+            };
+        }
+
+        // 4. Generate JWT (payload có role)
+        var token = GenerateJwtToken(user);
+
+        // 5. Nếu role = admin → log vào admin_activity_logs
+        if (user.Role == "admin")
+        {
+            var activityLog = new AdminActivityLog
+            {
+                AdminId = user.Id,
+                Action = "LOGIN",
+                EntityType = "user",
+                EntityId = user.Id,
+                IpAddress = ipAddress
+            };
+            await _userRepository.AddAdminActivityLogAsync(activityLog);
+        }
+
+        // 6. Return user (có role) + token
+        return new AuthResponseDto
+        {
+            Success = true,
+            Message = "Đăng nhập thành công",
+            Data = new AuthDataDto
+            {
+                User = new UserResponseDto
+                {
+                    Id = user.Id,
+                    Username = user.Username,
+                    Email = user.Email,
+                    Phone = user.Phone,
+                    FullName = user.FullName,
+                    Role = user.Role,
+                    AvatarUrl = user.AvatarUrl,
+                    CreatedAt = user.CreatedAt
+                },
+                Token = token
+            }
+        };
+    }
+
+    /// <summary>
+    /// Lưu FCM token
+    /// </summary>
+    public async Task<BaseResponseDto> SaveFcmTokenAsync(int userId, FcmTokenRequestDto request)
+    {
+        await _userRepository.SaveDeviceTokenAsync(userId, request.Token, request.DeviceType);
+
+        return new BaseResponseDto
+        {
+            Success = true,
+            Message = "Lưu token thành công"
+        };
+    }
+
+    /// <summary>
+    /// Đăng xuất
+    /// </summary>
+    public async Task<BaseResponseDto> LogoutAsync(int userId, LogoutRequestDto? request)
+    {
+        if (!string.IsNullOrEmpty(request?.FcmToken))
+        {
+            await _userRepository.RemoveDeviceTokenAsync(userId, request.FcmToken);
+        }
+
+        return new BaseResponseDto
+        {
+            Success = true,
+            Message = "Đăng xuất thành công"
         };
     }
 
@@ -123,8 +233,9 @@ public class AuthService : IAuthService
 
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.Username),
+            new Claim("user_id", user.Id.ToString()),
+            new Claim("username", user.Username),
+            new Claim("role", user.Role ?? "customer"),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
