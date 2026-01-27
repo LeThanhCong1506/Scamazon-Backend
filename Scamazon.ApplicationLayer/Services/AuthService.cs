@@ -254,4 +254,102 @@ public class AuthService : IAuthService
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+    /// <summary>
+    /// Lấy profile của user
+    /// </summary>
+    public async Task<ProfileResponseDto> GetProfileAsync(int userId)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+
+        if (user == null)
+        {
+            return new ProfileResponseDto
+            {
+                Success = false,
+                Message = "Không tìm thấy người dùng"
+            };
+        }
+
+        return new ProfileResponseDto
+        {
+            Success = true,
+            Data = new ProfileDataDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Email = user.Email,
+                Phone = user.Phone,
+                FullName = user.FullName,
+                AvatarUrl = user.AvatarUrl,
+                Role = user.Role,
+                Address = user.Address,
+                City = user.City,
+                District = user.District,
+                Ward = user.Ward,
+                CreatedAt = user.CreatedAt
+            }
+        };
+    }
+
+    /// <summary>
+    /// Cập nhật profile của user
+    /// </summary>
+    public async Task<ProfileResponseDto> UpdateProfileAsync(int userId, UpdateProfileRequestDto request)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+
+        if (user == null)
+        {
+            return new ProfileResponseDto
+            {
+                Success = false,
+                Message = "Không tìm thấy người dùng"
+            };
+        }
+
+        // Kiểm tra email đã tồn tại chưa (trừ user hiện tại)
+        if (!string.IsNullOrEmpty(request.Email) &&
+            await _userRepository.EmailExistsExceptUserAsync(request.Email, userId))
+        {
+            return new ProfileResponseDto
+            {
+                Success = false,
+                Message = "Email đã được sử dụng"
+            };
+        }
+
+        // Cập nhật các field nếu có giá trị
+        if (request.Email != null) user.Email = request.Email;
+        if (request.Phone != null) user.Phone = request.Phone;
+        if (request.FullName != null) user.FullName = request.FullName;
+        if (request.AvatarUrl != null) user.AvatarUrl = request.AvatarUrl;
+        if (request.Address != null) user.Address = request.Address;
+        if (request.City != null) user.City = request.City;
+        if (request.District != null) user.District = request.District;
+        if (request.Ward != null) user.Ward = request.Ward;
+
+        var updatedUser = await _userRepository.UpdateUserAsync(user);
+
+        return new ProfileResponseDto
+        {
+            Success = true,
+            Message = "Cập nhật thành công",
+            Data = new ProfileDataDto
+            {
+                Id = updatedUser.Id,
+                Username = updatedUser.Username,
+                Email = updatedUser.Email,
+                Phone = updatedUser.Phone,
+                FullName = updatedUser.FullName,
+                AvatarUrl = updatedUser.AvatarUrl,
+                Role = updatedUser.Role,
+                Address = updatedUser.Address,
+                City = updatedUser.City,
+                District = updatedUser.District,
+                Ward = updatedUser.Ward,
+                CreatedAt = updatedUser.CreatedAt
+            }
+        };
+    }
 }

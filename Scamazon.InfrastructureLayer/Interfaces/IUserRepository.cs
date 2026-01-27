@@ -51,4 +51,14 @@ public interface IUserRepository
     /// Xóa tất cả FCM token của user
     /// </summary>
     Task RemoveAllDeviceTokensAsync(int userId);
+
+    /// <summary>
+    /// Cập nhật thông tin user
+    /// </summary>
+    Task<User> UpdateUserAsync(User user);
+
+    /// <summary>
+    /// Kiểm tra email đã tồn tại chưa (trừ user hiện tại)
+    /// </summary>
+    Task<bool> EmailExistsExceptUserAsync(string email, int userId);
 }

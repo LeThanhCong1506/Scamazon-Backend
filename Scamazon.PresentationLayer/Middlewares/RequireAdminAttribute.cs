@@ -25,7 +25,7 @@ public class RequireAdminAttribute : Attribute, IAuthorizationFilter
         }
 
         // Kiểm tra role = admin
-        var roleClaim = user.FindFirst("role");
+        var roleClaim = user.FindFirst("http://schemas.microsoft.com/ws/2008/06/identity/claims/role");
         if (roleClaim == null || roleClaim.Value != "admin")
         {
             context.Result = new ObjectResult(new

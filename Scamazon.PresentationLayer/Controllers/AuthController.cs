@@ -169,4 +169,71 @@ public class AuthController : ControllerBase
 
         return Ok(result);
     }
+
+    /// <summary>
+    /// Lấy thông tin profile của user hiện tại
+    /// </summary>
+    /// <returns>Profile data</returns>
+    /// <response code="200">Lấy profile thành công</response>
+    /// <response code="401">Chưa đăng nhập</response>
+    [HttpGet("profile")]
+    [Authorize]
+    [ProducesResponseType(typeof(ProfileResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetProfile()
+    {
+        var userId = GetUserIdFromToken();
+        var result = await _authService.GetProfileAsync(userId);
+
+        if (!result.Success)
+        {
+            return NotFound(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Cập nhật thông tin profile của user hiện tại
+    /// </summary>
+    /// <param name="request">Thông tin cần cập nhật</param>
+    /// <returns>Profile data đã cập nhật</returns>
+    /// <response code="200">Cập nhật thành công</response>
+    /// <response code="400">Validation error hoặc email đã tồn tại</response>
+    /// <response code="401">Chưa đăng nhập</response>
+    [HttpPut("profile")]
+    [Authorize]
+    [ProducesResponseType(typeof(ProfileResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProfileResponseDto), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequestDto request)
+    {
+        if (!ModelState.IsValid)
+        {
+            var errors = ModelState
+                .Where(x => x.Value?.Errors.Count > 0)
+                .SelectMany(x => x.Value!.Errors.Select(e => new ValidationErrorDto
+                {
+                    Field = x.Key.ToLower(),
+                    Message = e.ErrorMessage
+                }))
+                .ToList();
+
+            return BadRequest(new ProfileResponseDto
+            {
+                Success = false,
+                Message = "Dữ liệu không hợp lệ"
+            });
+        }
+
+        var userId = GetUserIdFromToken();
+        var result = await _authService.UpdateProfileAsync(userId, request);
+
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
 }

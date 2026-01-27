@@ -27,4 +27,14 @@ public interface IAuthService
     /// Đăng xuất
     /// </summary>
     Task<BaseResponseDto> LogoutAsync(int userId, LogoutRequestDto? request);
+
+    /// <summary>
+    /// Lấy profile của user
+    /// </summary>
+    Task<ProfileResponseDto> GetProfileAsync(int userId);
+
+    /// <summary>
+    /// Cập nhật profile của user
+    /// </summary>
+    Task<ProfileResponseDto> UpdateProfileAsync(int userId, UpdateProfileRequestDto request);
 }

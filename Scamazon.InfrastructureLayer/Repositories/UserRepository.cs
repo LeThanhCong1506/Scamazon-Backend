@@ -141,4 +141,24 @@ public class UserRepository : IUserRepository
 
         await _context.SaveChangesAsync();
     }
+
+    /// <summary>
+    /// Cập nhật thông tin user
+    /// </summary>
+    public async Task<User> UpdateUserAsync(User user)
+    {
+        user.UpdatedAt = DateTime.Now;
+        _context.Users.Update(user);
+        await _context.SaveChangesAsync();
+        return user;
+    }
+
+    /// <summary>
+    /// Kiểm tra email đã tồn tại chưa (trừ user hiện tại)
+    /// </summary>
+    public async Task<bool> EmailExistsExceptUserAsync(string email, int userId)
+    {
+        return await _context.Users
+            .AnyAsync(u => u.Email != null && u.Email.ToLower() == email.ToLower() && u.Id != userId);
+    }
 }

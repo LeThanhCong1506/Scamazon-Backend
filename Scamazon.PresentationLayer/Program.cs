@@ -27,9 +27,11 @@ namespace MV.PresentationLayer
 
             // Register Repositories
             builder.Services.AddScoped<IUserRepository, UserRepository>();
+            builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 
             // Register Services
             builder.Services.AddScoped<IAuthService, AuthService>();
+            builder.Services.AddScoped<IDashboardService, DashboardService>();
 
             // Configure JWT Authentication
             var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -95,14 +97,15 @@ namespace MV.PresentationLayer
                     Description = "API cho ứng dụng Scamazon E-commerce"
                 });
 
-                // Cấu hình JWT Authentication cho Swagger
+                // Use HTTP Bearer scheme so Swagger UI asks for the raw token (no "Bearer " prefix)
                 c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
                 {
-                    Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token",
+                    Description = "Enter only the JWT token. Swagger UI will add the 'Bearer ' prefix automatically.",
                     Name = "Authorization",
                     In = ParameterLocation.Header,
-                    Type = SecuritySchemeType.ApiKey,
-                    Scheme = "Bearer"
+                    Type = SecuritySchemeType.Http,
+                    Scheme = "bearer",
+                    BearerFormat = "JWT"
                 });
 
                 c.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -114,7 +117,10 @@ namespace MV.PresentationLayer
                             {
                                 Type = ReferenceType.SecurityScheme,
                                 Id = "Bearer"
-                            }
+                            },
+                            Scheme = "bearer",
+                            Name = "Bearer",
+                            In = ParameterLocation.Header
                         },
                         Array.Empty<string>()
                     }
