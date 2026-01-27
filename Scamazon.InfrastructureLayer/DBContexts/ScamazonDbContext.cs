@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using MV.DomainLayer.Entities;
 
-namespace MV.InfrastructureLayer.DbContexts;
+namespace MV.InfrastructureLayer.DBContexts;
 
 public partial class ScamazonDbContext : DbContext
 {
@@ -15,6 +15,8 @@ public partial class ScamazonDbContext : DbContext
         : base(options)
     {
     }
+
+    public virtual DbSet<AdminActivityLog> AdminActivityLogs { get; set; }
 
     public virtual DbSet<Brand> Brands { get; set; }
 
@@ -48,7 +50,13 @@ public partial class ScamazonDbContext : DbContext
 
     public virtual DbSet<User> Users { get; set; }
 
+    public virtual DbSet<VAdminDashboardStat> VAdminDashboardStats { get; set; }
+
     public virtual DbSet<VProductsWithRating> VProductsWithRatings { get; set; }
+
+    public virtual DbSet<VRecentOrder> VRecentOrders { get; set; }
+
+    public virtual DbSet<VTopSellingProduct> VTopSellingProducts { get; set; }
 
     public virtual DbSet<VUserCartCount> VUserCartCounts { get; set; }
 
@@ -58,6 +66,47 @@ public partial class ScamazonDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<AdminActivityLog>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("admin_activity_logs_pkey");
+
+            entity.ToTable("admin_activity_logs", tb => tb.HasComment("Ghi log các hoạt động của admin để audit"));
+
+            entity.HasIndex(e => e.Action, "idx_admin_logs_action");
+
+            entity.HasIndex(e => e.AdminId, "idx_admin_logs_admin");
+
+            entity.HasIndex(e => e.CreatedAt, "idx_admin_logs_created").IsDescending();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Action)
+                .HasMaxLength(100)
+                .HasColumnName("action");
+            entity.Property(e => e.AdminId).HasColumnName("admin_id");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("created_at");
+            entity.Property(e => e.EntityId).HasColumnName("entity_id");
+            entity.Property(e => e.EntityType)
+                .HasMaxLength(50)
+                .HasColumnName("entity_type");
+            entity.Property(e => e.IpAddress)
+                .HasMaxLength(50)
+                .HasColumnName("ip_address");
+            entity.Property(e => e.NewData)
+                .HasColumnType("jsonb")
+                .HasColumnName("new_data");
+            entity.Property(e => e.OldData)
+                .HasColumnType("jsonb")
+                .HasColumnName("old_data");
+
+            entity.HasOne(d => d.Admin).WithMany(p => p.AdminActivityLogs)
+                .HasForeignKey(d => d.AdminId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("admin_activity_logs_admin_id_fkey");
+        });
+
         modelBuilder.Entity<Brand>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("brands_pkey");
@@ -185,6 +234,9 @@ public partial class ScamazonDbContext : DbContext
             entity.HasIndex(e => e.ChatRoomId, "idx_chat_messages_room");
 
             entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.AdminId)
+                .HasComment("ID của admin trả lời tin nhắn (nếu is_from_store = true)")
+                .HasColumnName("admin_id");
             entity.Property(e => e.ChatRoomId).HasColumnName("chat_room_id");
             entity.Property(e => e.Content).HasColumnName("content");
             entity.Property(e => e.CreatedAt)
@@ -207,6 +259,10 @@ public partial class ScamazonDbContext : DbContext
             entity.Property(e => e.ProductId).HasColumnName("product_id");
             entity.Property(e => e.SenderId).HasColumnName("sender_id");
 
+            entity.HasOne(d => d.Admin).WithMany(p => p.ChatMessageAdmins)
+                .HasForeignKey(d => d.AdminId)
+                .HasConstraintName("chat_messages_admin_id_fkey");
+
             entity.HasOne(d => d.ChatRoom).WithMany(p => p.ChatMessages)
                 .HasForeignKey(d => d.ChatRoomId)
                 .HasConstraintName("chat_messages_chat_room_id_fkey");
@@ -215,7 +271,7 @@ public partial class ScamazonDbContext : DbContext
                 .HasForeignKey(d => d.ProductId)
                 .HasConstraintName("chat_messages_product_id_fkey");
 
-            entity.HasOne(d => d.Sender).WithMany(p => p.ChatMessages)
+            entity.HasOne(d => d.Sender).WithMany(p => p.ChatMessageSenders)
                 .HasForeignKey(d => d.SenderId)
                 .HasConstraintName("chat_messages_sender_id_fkey");
         });
@@ -646,6 +702,8 @@ public partial class ScamazonDbContext : DbContext
 
             entity.HasIndex(e => e.Phone, "idx_users_phone");
 
+            entity.HasIndex(e => e.Role, "idx_users_role");
+
             entity.HasIndex(e => e.Email, "users_email_key").IsUnique();
 
             entity.HasIndex(e => e.Username, "users_username_key").IsUnique();
@@ -680,6 +738,11 @@ public partial class ScamazonDbContext : DbContext
             entity.Property(e => e.Phone)
                 .HasMaxLength(20)
                 .HasColumnName("phone");
+            entity.Property(e => e.Role)
+                .HasMaxLength(20)
+                .HasDefaultValueSql("'customer'::character varying")
+                .HasComment("Phân quyền: customer = khách hàng, admin = quản trị viên")
+                .HasColumnName("role");
             entity.Property(e => e.UpdatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("timestamp without time zone")
@@ -690,6 +753,27 @@ public partial class ScamazonDbContext : DbContext
             entity.Property(e => e.Ward)
                 .HasMaxLength(100)
                 .HasColumnName("ward");
+        });
+
+        modelBuilder.Entity<VAdminDashboardStat>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("v_admin_dashboard_stats");
+
+            entity.Property(e => e.ActiveChats).HasColumnName("active_chats");
+            entity.Property(e => e.ConfirmedOrders).HasColumnName("confirmed_orders");
+            entity.Property(e => e.DeliveredOrders).HasColumnName("delivered_orders");
+            entity.Property(e => e.LowStockProducts).HasColumnName("low_stock_products");
+            entity.Property(e => e.NewCustomers7days).HasColumnName("new_customers_7days");
+            entity.Property(e => e.OrdersToday).HasColumnName("orders_today");
+            entity.Property(e => e.PendingOrders).HasColumnName("pending_orders");
+            entity.Property(e => e.Revenue30days).HasColumnName("revenue_30days");
+            entity.Property(e => e.Revenue7days).HasColumnName("revenue_7days");
+            entity.Property(e => e.RevenueToday).HasColumnName("revenue_today");
+            entity.Property(e => e.ShippingOrders).HasColumnName("shipping_orders");
+            entity.Property(e => e.TotalCustomers).HasColumnName("total_customers");
+            entity.Property(e => e.TotalProducts).HasColumnName("total_products");
         });
 
         modelBuilder.Entity<VProductsWithRating>(entity =>
@@ -731,6 +815,59 @@ public partial class ScamazonDbContext : DbContext
                 .HasColumnType("timestamp without time zone")
                 .HasColumnName("updated_at");
             entity.Property(e => e.ViewCount).HasColumnName("view_count");
+        });
+
+        modelBuilder.Entity<VRecentOrder>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("v_recent_orders");
+
+            entity.Property(e => e.CreatedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("created_at");
+            entity.Property(e => e.CustomerName)
+                .HasMaxLength(100)
+                .HasColumnName("customer_name");
+            entity.Property(e => e.CustomerPhone)
+                .HasMaxLength(20)
+                .HasColumnName("customer_phone");
+            entity.Property(e => e.CustomerUsername)
+                .HasMaxLength(50)
+                .HasColumnName("customer_username");
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.OrderCode)
+                .HasMaxLength(50)
+                .HasColumnName("order_code");
+            entity.Property(e => e.Status)
+                .HasMaxLength(50)
+                .HasColumnName("status");
+            entity.Property(e => e.Total)
+                .HasPrecision(15, 2)
+                .HasColumnName("total");
+        });
+
+        modelBuilder.Entity<VTopSellingProduct>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("v_top_selling_products");
+
+            entity.Property(e => e.BrandName)
+                .HasMaxLength(100)
+                .HasColumnName("brand_name");
+            entity.Property(e => e.CategoryName)
+                .HasMaxLength(100)
+                .HasColumnName("category_name");
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Name)
+                .HasMaxLength(255)
+                .HasColumnName("name");
+            entity.Property(e => e.Price)
+                .HasPrecision(15, 2)
+                .HasColumnName("price");
+            entity.Property(e => e.SoldCount).HasColumnName("sold_count");
+            entity.Property(e => e.StockQuantity).HasColumnName("stock_quantity");
         });
 
         modelBuilder.Entity<VUserCartCount>(entity =>

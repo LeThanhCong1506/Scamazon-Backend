@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MV.DomainLayer.Entities;
-using MV.InfrastructureLayer.DbContexts;
+using MV.InfrastructureLayer.DBContexts;
 using MV.InfrastructureLayer.Interfaces;
 
 namespace MV.InfrastructureLayer.Repositories;
