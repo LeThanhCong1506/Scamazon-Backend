@@ -27,11 +27,9 @@ namespace MV.PresentationLayer
 
             // Register Repositories
             builder.Services.AddScoped<IUserRepository, UserRepository>();
-            builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 
             // Register Services
             builder.Services.AddScoped<IAuthService, AuthService>();
-            builder.Services.AddScoped<IDashboardService, DashboardService>();
 
             // Configure JWT Authentication
             var jwtSettings = builder.Configuration.GetSection("JwtSettings");

@@ -100,7 +100,6 @@ public class AuthService : IAuthService
                     Email = createdUser.Email,
                     Phone = createdUser.Phone,
                     FullName = createdUser.FullName,
-                    Role = createdUser.Role,
                     AvatarUrl = createdUser.AvatarUrl,
                     CreatedAt = createdUser.CreatedAt
                 },
@@ -146,24 +145,10 @@ public class AuthService : IAuthService
             };
         }
 
-        // 4. Generate JWT (payload có role)
+        // 4. Generate JWT token
         var token = GenerateJwtToken(user);
 
-        // 5. Nếu role = admin → log vào admin_activity_logs
-        if (user.Role == "admin")
-        {
-            var activityLog = new AdminActivityLog
-            {
-                AdminId = user.Id,
-                Action = "LOGIN",
-                EntityType = "user",
-                EntityId = user.Id,
-                IpAddress = ipAddress
-            };
-            await _userRepository.AddAdminActivityLogAsync(activityLog);
-        }
-
-        // 6. Return user (có role) + token
+        // 5. Return user info + token
         return new AuthResponseDto
         {
             Success = true,
@@ -177,7 +162,6 @@ public class AuthService : IAuthService
                     Email = user.Email,
                     Phone = user.Phone,
                     FullName = user.FullName,
-                    Role = user.Role,
                     AvatarUrl = user.AvatarUrl,
                     CreatedAt = user.CreatedAt
                 },
@@ -235,7 +219,6 @@ public class AuthService : IAuthService
         {
             new Claim("user_id", user.Id.ToString()),
             new Claim("username", user.Username),
-            new Claim("role", user.Role ?? "customer"),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
@@ -282,7 +265,6 @@ public class AuthService : IAuthService
                 Phone = user.Phone,
                 FullName = user.FullName,
                 AvatarUrl = user.AvatarUrl,
-                Role = user.Role,
                 Address = user.Address,
                 City = user.City,
                 District = user.District,
@@ -343,7 +325,6 @@ public class AuthService : IAuthService
                 Phone = updatedUser.Phone,
                 FullName = updatedUser.FullName,
                 AvatarUrl = updatedUser.AvatarUrl,
-                Role = updatedUser.Role,
                 Address = updatedUser.Address,
                 City = updatedUser.City,
                 District = updatedUser.District,

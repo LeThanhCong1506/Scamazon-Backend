@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTO.RequestModels;
 using MV.DomainLayer.DTO.ResponseModels;
-using MV.PresentationLayer.Middlewares;
 
 namespace MV.PresentationLayer.Controllers;
 

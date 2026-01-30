@@ -68,16 +68,6 @@ public class UserRepository : IUserRepository
     }
 
     /// <summary>
-    /// Thêm admin activity log
-    /// </summary>
-    public async Task AddAdminActivityLogAsync(AdminActivityLog log)
-    {
-        log.CreatedAt = DateTime.Now;
-        _context.AdminActivityLogs.Add(log);
-        await _context.SaveChangesAsync();
-    }
-
-    /// <summary>
     /// Lưu FCM token cho user
     /// </summary>
     public async Task SaveDeviceTokenAsync(int userId, string token, string? deviceType)
