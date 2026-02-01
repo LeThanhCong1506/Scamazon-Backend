@@ -23,8 +23,6 @@
 
   <ItemGroup>
     <Folder Include="Configuration\" />
-    <Folder Include="DTO\ResponseModels\" />
-    <Folder Include="DTO\RequestModels\" />
     <Folder Include="Enums\" />
     <Folder Include="Exceptions\" />
     <Folder Include="Configuration\" />

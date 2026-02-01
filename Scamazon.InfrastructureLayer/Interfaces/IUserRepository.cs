@@ -33,11 +33,6 @@ public interface IUserRepository
     Task<User?> GetByIdAsync(int id);
 
     /// <summary>
-    /// Thêm admin activity log
-    /// </summary>
-    Task AddAdminActivityLogAsync(AdminActivityLog log);
-
-    /// <summary>
     /// Lưu FCM token cho user
     /// </summary>
     Task SaveDeviceTokenAsync(int userId, string token, string? deviceType);
