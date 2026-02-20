@@ -48,12 +48,49 @@ public partial class ScamazonDbContext : DbContext
 
     public virtual DbSet<User> Users { get; set; }
 
+    public virtual DbSet<AdminActivityLog> AdminActivityLogs { get; set; }
+
     public virtual DbSet<VProductsWithRating> VProductsWithRatings { get; set; }
 
     public virtual DbSet<VUserCartCount> VUserCartCounts { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<AdminActivityLog>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("admin_activity_logs_pkey");
+
+            entity.ToTable("admin_activity_logs");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.AdminId).HasColumnName("admin_id");
+            entity.Property(e => e.Action)
+                .HasMaxLength(100)
+                .HasColumnName("action");
+            entity.Property(e => e.EntityType)
+                .HasMaxLength(50)
+                .HasColumnName("entity_type");
+            entity.Property(e => e.EntityId).HasColumnName("entity_id");
+            entity.Property(e => e.OldData)
+                .HasColumnType("jsonb")
+                .HasColumnName("old_data");
+            entity.Property(e => e.NewData)
+                .HasColumnType("jsonb")
+                .HasColumnName("new_data");
+            entity.Property(e => e.IpAddress)
+                .HasMaxLength(50)
+                .HasColumnName("ip_address");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("created_at");
+
+            entity.HasOne(d => d.Admin).WithMany(p => p.AdminActivityLogs)
+                .HasForeignKey(d => d.AdminId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("admin_activity_logs_admin_id_fkey");
+        });
+
         modelBuilder.Entity<Brand>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("brands_pkey");
@@ -642,6 +679,8 @@ public partial class ScamazonDbContext : DbContext
 
             entity.HasIndex(e => e.Phone, "idx_users_phone");
 
+            entity.HasIndex(e => e.Role, "idx_users_role");
+
             entity.HasIndex(e => e.Email, "users_email_key").IsUnique();
 
             entity.HasIndex(e => e.Username, "users_username_key").IsUnique();
@@ -676,6 +715,10 @@ public partial class ScamazonDbContext : DbContext
             entity.Property(e => e.Phone)
                 .HasMaxLength(20)
                 .HasColumnName("phone");
+            entity.Property(e => e.Role)
+                .HasMaxLength(20)
+                .HasDefaultValueSql("'customer'::character varying")
+                .HasColumnName("role");
             entity.Property(e => e.UpdatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("timestamp without time zone")

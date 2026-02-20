@@ -31,12 +31,14 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IBrandRepository, BrandRepository>();
             builder.Services.AddScoped<IProductRepository, ProductRepository>();
             builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
+            builder.Services.AddScoped<IAdminRepository, AdminRepository>();
 
             // Register Services
             builder.Services.AddScoped<IAuthService, AuthService>();
             builder.Services.AddScoped<ICategoryService, CategoryService>();
             builder.Services.AddScoped<IBrandService, BrandService>();
             builder.Services.AddScoped<IProductService, ProductService>();
+            builder.Services.AddScoped<IAdminService, AdminService>();
 
             // Configure JWT Authentication
             var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -142,6 +144,9 @@ namespace MV.PresentationLayer
             }
 
             app.UseHttpsRedirection();
+
+            // Serve static files (uploads)
+            app.UseStaticFiles();
 
             // Authentication phải đứng trước Authorization
             app.UseAuthentication();

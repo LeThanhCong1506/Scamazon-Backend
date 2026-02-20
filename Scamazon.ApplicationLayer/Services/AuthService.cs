@@ -17,13 +17,16 @@ namespace MV.ApplicationLayer.Services;
 public class AuthService : IAuthService
 {
     private readonly IUserRepository _userRepository;
+    private readonly IAdminRepository _adminRepository;
     private readonly IConfiguration _configuration;
 
-    public AuthService(IUserRepository userRepository, IConfiguration configuration)
+    public AuthService(IUserRepository userRepository, IAdminRepository adminRepository, IConfiguration configuration)
     {
         _userRepository = userRepository;
+        _adminRepository = adminRepository;
         _configuration = configuration;
     }
+
 
     /// <summary>
     /// Đăng ký tài khoản mới
@@ -77,13 +80,14 @@ public class AuthService : IAuthService
             Address = request.Address,
             City = request.City,
             District = request.District,
-            Ward = request.Ward
+            Ward = request.Ward,
+            Role = "customer"  // Luôn là customer khi đăng ký
         };
 
         // 5. INSERT user mới vào table users
         var createdUser = await _userRepository.CreateUserAsync(user);
 
-        // 6. Generate JWT token (payload: user_id, username, exp: 7 ngày)
+        // 6. Generate JWT token (payload: user_id, username, role, exp: 7 ngày)
         var token = GenerateJwtToken(createdUser);
 
         // 7. Return user info + token
@@ -101,6 +105,7 @@ public class AuthService : IAuthService
                     Phone = createdUser.Phone,
                     FullName = createdUser.FullName,
                     AvatarUrl = createdUser.AvatarUrl,
+                    Role = createdUser.Role,
                     CreatedAt = createdUser.CreatedAt
                 },
                 Token = token
@@ -148,7 +153,20 @@ public class AuthService : IAuthService
         // 4. Generate JWT token
         var token = GenerateJwtToken(user);
 
-        // 5. Return user info + token
+        // 5. Nếu role = admin → log vào admin_activity_logs
+        if (user.Role == "admin")
+        {
+            await _adminRepository.LogActivityAsync(new AdminActivityLog
+            {
+                AdminId = user.Id,
+                Action = "login",
+                EntityType = "user",
+                EntityId = user.Id,
+                IpAddress = ipAddress
+            });
+        }
+
+        // 6. Return user info (có role) + token
         return new AuthResponseDto
         {
             Success = true,
@@ -163,6 +181,7 @@ public class AuthService : IAuthService
                     Phone = user.Phone,
                     FullName = user.FullName,
                     AvatarUrl = user.AvatarUrl,
+                    Role = user.Role,
                     CreatedAt = user.CreatedAt
                 },
                 Token = token
@@ -219,6 +238,7 @@ public class AuthService : IAuthService
         {
             new Claim("user_id", user.Id.ToString()),
             new Claim("username", user.Username),
+            new Claim(ClaimTypes.Role, user.Role),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
@@ -265,6 +285,7 @@ public class AuthService : IAuthService
                 Phone = user.Phone,
                 FullName = user.FullName,
                 AvatarUrl = user.AvatarUrl,
+                Role = user.Role,
                 Address = user.Address,
                 City = user.City,
                 District = user.District,
@@ -325,6 +346,7 @@ public class AuthService : IAuthService
                 Phone = updatedUser.Phone,
                 FullName = updatedUser.FullName,
                 AvatarUrl = updatedUser.AvatarUrl,
+                Role = updatedUser.Role,
                 Address = updatedUser.Address,
                 City = updatedUser.City,
                 District = updatedUser.District,

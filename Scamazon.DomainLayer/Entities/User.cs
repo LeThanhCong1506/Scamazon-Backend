@@ -30,11 +30,18 @@ public partial class User
 
     public string? Ward { get; set; }
 
+    /// <summary>
+    /// Phân quyền: 'customer' hoặc 'admin'
+    /// </summary>
+    public string Role { get; set; } = "customer";
+
     public bool? IsActive { get; set; }
 
     public DateTime? CreatedAt { get; set; }
 
     public DateTime? UpdatedAt { get; set; }
+
+    public virtual ICollection<AdminActivityLog> AdminActivityLogs { get; set; } = new List<AdminActivityLog>();
 
     public virtual Cart? Cart { get; set; }
 
