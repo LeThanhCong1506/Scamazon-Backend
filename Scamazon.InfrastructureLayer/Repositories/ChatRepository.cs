@@ -115,4 +115,12 @@ public class ChatRepository : IChatRepository
         return await _context.ChatMessages
             .CountAsync(m => m.ChatRoomId == chatRoomId && m.SenderId != userId && m.IsRead == false);
     }
+
+    public async Task<List<int>> GetAdminUserIdsAsync()
+    {
+        return await _context.Users
+            .Where(u => u.Role == "admin")
+            .Select(u => u.Id)
+            .ToListAsync();
+    }
 }

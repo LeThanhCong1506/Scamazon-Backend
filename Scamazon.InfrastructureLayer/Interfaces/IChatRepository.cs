@@ -13,4 +13,5 @@ public interface IChatRepository
     Task UpdateLastMessageAtAsync(int chatRoomId, DateTime timestamp);
     Task MarkMessagesAsReadAsync(int chatRoomId, int userId);
     Task<int> CountUnreadMessagesAsync(int chatRoomId, int userId);
+    Task<List<int>> GetAdminUserIdsAsync();
 }

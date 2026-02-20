@@ -13,3 +13,8 @@ public class SendMessageRequestDto
 
     public int? ProductId { get; set; }
 }
+
+public class StartChatRequestDto
+{
+    public int? StoreId { get; set; }
+}

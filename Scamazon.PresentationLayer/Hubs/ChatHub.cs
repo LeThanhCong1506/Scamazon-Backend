@@ -11,13 +11,15 @@ public class ChatHub : Hub
 {
     private readonly IChatService _chatService;
     private readonly INotificationService _notificationService;
+    private readonly ILogger<ChatHub> _logger;
 
     private static readonly ConcurrentDictionary<int, HashSet<string>> _userConnections = new();
 
-    public ChatHub(IChatService chatService, INotificationService notificationService)
+    public ChatHub(IChatService chatService, INotificationService notificationService, ILogger<ChatHub> logger)
     {
         _chatService = chatService;
         _notificationService = notificationService;
+        _logger = logger;
     }
 
     public override Task OnConnectedAsync()
@@ -75,22 +77,40 @@ public class ChatHub : Hub
         {
             await Clients.Group($"chat_{chatRoomId}").SendAsync("ReceiveMessage", result.Data);
 
-            // Push notification if recipient is offline
-            var recipientUserId = await GetRecipientUserId(chatRoomId, userId);
-            if (recipientUserId > 0 && !IsUserOnline(recipientUserId))
+            // Push notification to offline recipients
+            try
             {
-                try
+                var roomOwnerId = await _chatService.GetChatRoomOwnerIdAsync(chatRoomId);
+
+                if (roomOwnerId == userId)
                 {
+                    // Customer sent message → notify all offline admins
+                    var adminIds = await _chatService.GetAdminUserIdsAsync();
+                    foreach (var adminId in adminIds)
+                    {
+                        if (!IsUserOnline(adminId))
+                        {
+                            await _notificationService.SendChatNotificationAsync(
+                                adminId,
+                                result.Data.SenderName ?? "Người dùng",
+                                result.Data.Content,
+                                chatRoomId);
+                        }
+                    }
+                }
+                else if (roomOwnerId > 0 && !IsUserOnline(roomOwnerId))
+                {
+                    // Admin sent message → notify customer
                     await _notificationService.SendChatNotificationAsync(
-                        recipientUserId,
-                        result.Data.SenderName ?? "Người dùng",
+                        roomOwnerId,
+                        result.Data.SenderName ?? "Cửa hàng",
                         result.Data.Content,
                         chatRoomId);
                 }
-                catch
-                {
-                    // Don't fail message send if notification fails
-                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send chat notification for room {ChatRoomId}", chatRoomId);
             }
         }
     }
@@ -109,17 +129,5 @@ public class ChatHub : Hub
     private bool IsAdmin()
     {
         return Context.User?.IsInRole("admin") == true;
-    }
-
-    private async Task<int> GetRecipientUserId(int chatRoomId, int senderId)
-    {
-        // Get conversations to find the room owner
-        var conversations = await _chatService.GetAllChatRoomsAsync();
-        var room = conversations.Data?.FirstOrDefault(r => r.Id == chatRoomId);
-        if (room == null) return 0;
-
-        // If sender is the room owner (customer), notify admin (userId=0 means broadcast)
-        // If sender is admin, notify the room owner (customer)
-        return room.UserId == senderId ? 0 : room.UserId;
     }
 }

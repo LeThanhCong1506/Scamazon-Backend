@@ -52,6 +52,7 @@ public class AdminService : IAdminService
         return new DashboardStatsResponseDto
         {
             Success = true,
+            Message = "Lấy thống kê dashboard thành công",
             Data = new DashboardStatsDataDto
             {
                 Customers = new CustomerStatsDto { Total = totalCustomers, New7Days = newCustomers },
