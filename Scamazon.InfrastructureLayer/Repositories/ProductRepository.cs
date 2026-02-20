@@ -159,4 +159,54 @@ public class ProductRepository : IProductRepository
 
         return images.ToDictionary(i => i.ProductId, i => (string?)i.ImageUrl);
     }
+
+    public async Task<bool> SlugExistsAsync(string slug)
+    {
+        return await _context.Products.AnyAsync(p => p.Slug == slug);
+    }
+
+    public async Task<Product> CreateAsync(Product product)
+    {
+        _context.Products.Add(product);
+        await _context.SaveChangesAsync();
+        return product;
+    }
+
+    public async Task<Product> UpdateAsync(Product product)
+    {
+        _context.Products.Update(product);
+        await _context.SaveChangesAsync();
+        return product;
+    }
+
+    public async Task DeleteAsync(int id)
+    {
+        await _context.Products
+            .Where(p => p.Id == id)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(p => p.IsActive, false)
+                .SetProperty(p => p.UpdatedAt, DateTime.UtcNow));
+    }
+
+    public async Task DeleteProductImagesAsync(int productId)
+    {
+        await _context.ProductImages
+            .Where(i => i.ProductId == productId)
+            .ExecuteDeleteAsync();
+    }
+
+    public async Task AddProductImagesAsync(List<ProductImage> images)
+    {
+        _context.ProductImages.AddRange(images);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<Product?> GetByIdForAdminAsync(int id)
+    {
+        return await _context.Products
+            .Include(p => p.Category)
+            .Include(p => p.Brand)
+            .Include(p => p.ProductImages.OrderBy(i => i.SortOrder))
+            .FirstOrDefaultAsync(p => p.Id == id);
+    }
 }

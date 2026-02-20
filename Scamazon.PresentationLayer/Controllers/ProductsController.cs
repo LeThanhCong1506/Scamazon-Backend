@@ -14,10 +14,12 @@ namespace MV.PresentationLayer.Controllers;
 public class ProductsController : ControllerBase
 {
     private readonly IProductService _productService;
+    private readonly IAdminService _adminService;
 
-    public ProductsController(IProductService productService)
+    public ProductsController(IProductService productService, IAdminService adminService)
     {
         _productService = productService;
+        _adminService = adminService;
     }
 
     /// <summary>
@@ -170,5 +172,66 @@ public class ProductsController : ControllerBase
         }
 
         return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    // ==================== ADMIN CRUD ====================
+
+    /// <summary>
+    /// Tạo sản phẩm mới (Admin only)
+    /// </summary>
+    [HttpPost]
+    [Authorize(Roles = "admin")]
+    [ProducesResponseType(typeof(BaseResponseDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> CreateProduct([FromBody] CreateProductRequestDto request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var userId = GetUserIdFromToken();
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var result = await _adminService.CreateProductAsync(request, userId, ipAddress);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Cập nhật sản phẩm (Admin only)
+    /// </summary>
+    [HttpPut("{id:int}")]
+    [Authorize(Roles = "admin")]
+    [ProducesResponseType(typeof(BaseResponseDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateProduct(int id, [FromBody] UpdateProductRequestDto request)
+    {
+        var userId = GetUserIdFromToken();
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var result = await _adminService.UpdateProductAsync(id, request, userId, ipAddress);
+
+        if (!result.Success)
+        {
+            return NotFound(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Xóa sản phẩm - soft delete (Admin only)
+    /// </summary>
+    [HttpDelete("{id:int}")]
+    [Authorize(Roles = "admin")]
+    [ProducesResponseType(typeof(BaseResponseDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> DeleteProduct(int id)
+    {
+        var userId = GetUserIdFromToken();
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var result = await _adminService.DeleteProductAsync(id, userId, ipAddress);
+
+        if (!result.Success)
+        {
+            return NotFound(result);
+        }
+
+        return Ok(result);
     }
 }

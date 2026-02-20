@@ -31,6 +31,7 @@ public class UserResponseDto
     public string? Phone { get; set; }
     public string? FullName { get; set; }
     public string? AvatarUrl { get; set; }
+    public string Role { get; set; } = "customer";
     public DateTime? CreatedAt { get; set; }
 }
 

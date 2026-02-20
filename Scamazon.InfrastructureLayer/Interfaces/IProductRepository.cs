@@ -42,4 +42,39 @@ public interface IProductRepository
     /// Lấy primary images của nhiều sản phẩm
     /// </summary>
     Task<Dictionary<int, string?>> GetPrimaryImagesAsync(List<int> productIds);
+
+    /// <summary>
+    /// Kiểm tra slug đã tồn tại chưa
+    /// </summary>
+    Task<bool> SlugExistsAsync(string slug);
+
+    /// <summary>
+    /// Tạo sản phẩm mới
+    /// </summary>
+    Task<Product> CreateAsync(Product product);
+
+    /// <summary>
+    /// Cập nhật sản phẩm
+    /// </summary>
+    Task<Product> UpdateAsync(Product product);
+
+    /// <summary>
+    /// Xóa sản phẩm (soft delete)
+    /// </summary>
+    Task DeleteAsync(int id);
+
+    /// <summary>
+    /// Xóa tất cả ảnh của sản phẩm
+    /// </summary>
+    Task DeleteProductImagesAsync(int productId);
+
+    /// <summary>
+    /// Thêm ảnh cho sản phẩm
+    /// </summary>
+    Task AddProductImagesAsync(List<ProductImage> images);
+
+    /// <summary>
+    /// Lấy sản phẩm theo id (bao gồm cả inactive - dành cho Admin)
+    /// </summary>
+    Task<Product?> GetByIdForAdminAsync(int id);
 }
