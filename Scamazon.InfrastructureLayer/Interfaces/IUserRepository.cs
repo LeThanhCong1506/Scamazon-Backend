@@ -28,6 +28,11 @@ public interface IUserRepository
     Task<User?> GetByUsernameAsync(string username);
 
     /// <summary>
+    /// Lấy user theo email
+    /// </summary>
+    Task<User?> GetByEmailAsync(string email);
+
+    /// <summary>
     /// Lấy user theo id
     /// </summary>
     Task<User?> GetByIdAsync(int id);
