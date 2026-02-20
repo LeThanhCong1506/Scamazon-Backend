@@ -1,3 +1,26 @@
+-- 1. Thêm cột 'role' vào bảng users
+ALTER TABLE users 
+ADD COLUMN role VARCHAR(20) DEFAULT 'customer' NOT NULL;
+
+-- 2. Tạo index cho cột role
+CREATE INDEX idx_users_role ON users (role);
+
+-- 3. Tạo bảng admin_activity_logs
+CREATE TABLE admin_activity_logs (
+    id SERIAL PRIMARY KEY,
+    admin_id INTEGER NOT NULL,
+    action VARCHAR(100) NOT NULL,
+    entity_type VARCHAR(50),
+    entity_id INTEGER,
+    old_data JSONB,
+    new_data JSONB,
+    ip_address VARCHAR(50),
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT admin_activity_logs_admin_id_fkey 
+        FOREIGN KEY (admin_id) REFERENCES users(id)
+);
+----------------------------------------------------------------------
+
 -- Create Milestone 3 tables for Scamazon
 -- Run this script against SCAMAZON-DB
 
