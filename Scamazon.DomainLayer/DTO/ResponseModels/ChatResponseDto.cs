@@ -58,3 +58,10 @@ public class SendMessageResponseDto
     public string Message { get; set; } = null!;
     public ChatMessageDto? Data { get; set; }
 }
+
+public class StartChatResponseDto
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = null!;
+    public ChatRoomSummaryDto? Data { get; set; }
+}

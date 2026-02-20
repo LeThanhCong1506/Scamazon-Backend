@@ -22,6 +22,18 @@ public class ChatController : ControllerBase
         _hubContext = hubContext;
     }
 
+    [HttpPost("chat/start")]
+    [Authorize]
+    public async Task<IActionResult> StartChat([FromBody] StartChatRequestDto request)
+    {
+        var userId = GetUserIdFromToken();
+        if (userId == 0) return Unauthorized(new { success = false, message = "Token không hợp lệ" });
+
+        var result = await _chatService.StartChatAsync(userId, request.StoreId);
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
     [HttpGet("chat/conversations")]
     [Authorize]
     public async Task<IActionResult> GetConversations()
@@ -40,7 +52,8 @@ public class ChatController : ControllerBase
         var userId = GetUserIdFromToken();
         if (userId == 0) return Unauthorized(new { success = false, message = "Token không hợp lệ" });
 
-        var result = await _chatService.GetMessagesAsync(id, userId, page, limit);
+        var isAdmin = User.IsInRole("admin");
+        var result = await _chatService.GetMessagesAsync(id, userId, page, limit, isAdmin);
         if (!result.Success) return NotFound(result);
         return Ok(result);
     }
@@ -60,6 +73,41 @@ public class ChatController : ControllerBase
         if (result.Data != null)
         {
             await _hubContext.Clients.Group($"chat_{id}").SendAsync("ReceiveMessage", result.Data);
+
+            // Send push notification if recipient is offline (Bug 3 fix)
+            try
+            {
+                var roomOwnerId = await _chatService.GetChatRoomOwnerIdAsync(id);
+                if (roomOwnerId == userId)
+                {
+                    // Customer sent message → notify all admins
+                    var adminIds = await _chatService.GetAdminUserIdsAsync();
+                    foreach (var adminId in adminIds)
+                    {
+                        if (!ChatHub.IsUserOnline(adminId))
+                        {
+                            await _notificationService.SendChatNotificationAsync(
+                                adminId,
+                                result.Data.SenderName ?? "Người dùng",
+                                result.Data.Content,
+                                id);
+                        }
+                    }
+                }
+                else if (roomOwnerId > 0 && !ChatHub.IsUserOnline(roomOwnerId))
+                {
+                    // Admin sent message → notify customer
+                    await _notificationService.SendChatNotificationAsync(
+                        roomOwnerId,
+                        result.Data.SenderName ?? "Cửa hàng",
+                        result.Data.Content,
+                        id);
+                }
+            }
+            catch
+            {
+                // Don't fail message send if notification fails
+            }
         }
 
         return Ok(result);

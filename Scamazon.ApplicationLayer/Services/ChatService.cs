@@ -49,7 +49,7 @@ public class ChatService : IChatService
         };
     }
 
-    public async Task<ChatMessagesResponseDto> GetMessagesAsync(int chatRoomId, int userId, int page, int limit)
+    public async Task<ChatMessagesResponseDto> GetMessagesAsync(int chatRoomId, int userId, int page, int limit, bool isAdmin = false)
     {
         var room = await _chatRepository.GetChatRoomByIdAsync(chatRoomId);
         if (room == null)
@@ -61,10 +61,21 @@ public class ChatService : IChatService
             };
         }
 
-        // Mark messages as read
-        await _chatRepository.MarkMessagesAsReadAsync(chatRoomId, userId);
+        // Validate room access: only room owner or admin can read messages
+        if (room.UserId != userId && !isAdmin)
+        {
+            return new ChatMessagesResponseDto
+            {
+                Success = false,
+                Message = "Bạn không có quyền truy cập phòng chat này"
+            };
+        }
 
+        // Fetch messages first, then mark as read (so client sees original IsRead state)
         var messages = await _chatRepository.GetMessagesByChatRoomIdAsync(chatRoomId, page, limit);
+
+        // Mark messages as read after fetching
+        await _chatRepository.MarkMessagesAsReadAsync(chatRoomId, userId);
 
         var messageDtos = messages.Select(MapToMessageDto).ToList();
 
@@ -89,6 +100,16 @@ public class ChatService : IChatService
             {
                 Success = false,
                 Message = "Không tìm thấy phòng chat"
+            };
+        }
+
+        // Validate room access: only room owner or admin can send messages
+        if (room.UserId != senderId && !isFromStore)
+        {
+            return new SendMessageResponseDto
+            {
+                Success = false,
+                Message = "Bạn không có quyền gửi tin nhắn trong phòng chat này"
             };
         }
 
@@ -147,6 +168,50 @@ public class ChatService : IChatService
             Message = "Lấy tất cả phòng chat thành công",
             Data = data
         };
+    }
+
+    public async Task<StartChatResponseDto> StartChatAsync(int userId, int? storeId)
+    {
+        var room = await _chatRepository.GetOrCreateChatRoomAsync(userId, storeId);
+        if (room == null)
+        {
+            return new StartChatResponseDto
+            {
+                Success = false,
+                Message = "Không thể tạo phòng chat"
+            };
+        }
+
+        return new StartChatResponseDto
+        {
+            Success = true,
+            Message = "Tạo phòng chat thành công",
+            Data = new ChatRoomSummaryDto
+            {
+                Id = room.Id,
+                UserId = room.UserId,
+                UserName = room.User?.FullName ?? room.User?.Username,
+                UserAvatar = room.User?.AvatarUrl,
+                StoreId = room.StoreId,
+                StoreName = room.Store?.Name,
+                Status = room.Status,
+                LastMessage = null,
+                LastMessageAt = room.LastMessageAt,
+                UnreadCount = 0,
+                CreatedAt = room.CreatedAt
+            }
+        };
+    }
+
+    public async Task<int> GetChatRoomOwnerIdAsync(int chatRoomId)
+    {
+        var room = await _chatRepository.GetChatRoomByIdAsync(chatRoomId);
+        return room?.UserId ?? 0;
+    }
+
+    public async Task<List<int>> GetAdminUserIdsAsync()
+    {
+        return await _chatRepository.GetAdminUserIdsAsync();
     }
 
     private static ChatMessageDto MapToMessageDto(ChatMessage m)

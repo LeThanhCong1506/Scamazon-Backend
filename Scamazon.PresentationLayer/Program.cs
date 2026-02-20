@@ -149,9 +149,9 @@ namespace MV.PresentationLayer
                     });
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Firebase init failed - push notifications will be disabled
+                Console.WriteLine($"Firebase init failed - push notifications will be disabled: {ex.Message}");
             }
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

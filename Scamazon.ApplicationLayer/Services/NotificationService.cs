@@ -1,5 +1,6 @@
 using System.Text.Json;
 using FirebaseAdmin.Messaging;
+using Microsoft.Extensions.Logging;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTO.RequestModels;
 using MV.DomainLayer.DTO.ResponseModels;
@@ -11,10 +12,12 @@ namespace MV.ApplicationLayer.Services;
 public class NotificationService : INotificationService
 {
     private readonly INotificationRepository _notificationRepository;
+    private readonly ILogger<NotificationService> _logger;
 
-    public NotificationService(INotificationRepository notificationRepository)
+    public NotificationService(INotificationRepository notificationRepository, ILogger<NotificationService> logger)
     {
         _notificationRepository = notificationRepository;
+        _logger = logger;
     }
 
     public async Task<NotificationListResponseDto> GetNotificationsAsync(int userId, int page, int limit)
@@ -87,9 +90,9 @@ public class NotificationService : INotificationService
 
             await FirebaseMessaging.DefaultInstance.SendEachAsync(messages);
         }
-        catch
+        catch (Exception ex)
         {
-            // Fail silently - FCM push is best-effort
+            _logger.LogWarning(ex, "FCM push notification failed for user {UserId}", userId);
         }
     }
 
