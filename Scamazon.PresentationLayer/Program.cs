@@ -1,4 +1,6 @@
 using System.Text;
+using FirebaseAdmin;
+using Google.Apis.Auth.OAuth2;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -8,6 +10,7 @@ using MV.ApplicationLayer.Services;
 using MV.InfrastructureLayer.DBContexts;
 using MV.InfrastructureLayer.Interfaces;
 using MV.InfrastructureLayer.Repositories;
+using MV.PresentationLayer.Hubs;
 
 namespace MV.PresentationLayer
 {
@@ -22,6 +25,9 @@ namespace MV.PresentationLayer
 
             // Add services to the container.
             builder.Services.AddControllers();
+
+            // Add SignalR
+            builder.Services.AddSignalR();
 
             // Register DbContext with connection string from appsettings
             builder.Services.AddDbContext<ScamazonDbContext>(options =>
@@ -38,6 +44,9 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<ICartRepository, CartRepository>();
             builder.Services.AddScoped<IOrderRepository, OrderRepository>();
             builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+            builder.Services.AddScoped<IStoreRepository, StoreRepository>();
+            builder.Services.AddScoped<IChatRepository, ChatRepository>();
+            builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 
             // Register Services
             builder.Services.AddScoped<IAuthService, AuthService>();
@@ -48,6 +57,21 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<ICartService, CartService>();
             builder.Services.AddScoped<IOrderService, OrderService>();
             builder.Services.AddScoped<IPaymentService, PaymentService>();
+            builder.Services.AddScoped<IStoreService, StoreService>();
+            builder.Services.AddScoped<IChatService, ChatService>();
+            builder.Services.AddScoped<INotificationService, NotificationService>();
+
+            // Configure CORS
+            builder.Services.AddCors(options =>
+            {
+                options.AddDefaultPolicy(policy =>
+                {
+                    policy.SetIsOriginAllowed(_ => true)
+                          .AllowAnyHeader()
+                          .AllowAnyMethod()
+                          .AllowCredentials();
+                });
+            });
 
             // Configure JWT Authentication
             var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -74,6 +98,17 @@ namespace MV.PresentationLayer
                 // Custom response khi token không hợp lệ hoặc thiếu
                 options.Events = new JwtBearerEvents
                 {
+                    OnMessageReceived = context =>
+                    {
+                        // Read access_token from query string for SignalR WebSocket
+                        var accessToken = context.Request.Query["access_token"];
+                        var path = context.HttpContext.Request.Path;
+                        if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/chathub"))
+                        {
+                            context.Token = accessToken;
+                        }
+                        return Task.CompletedTask;
+                    },
                     OnChallenge = context =>
                     {
                         context.HandleResponse();
@@ -101,6 +136,23 @@ namespace MV.PresentationLayer
                     }
                 };
             });
+
+            // Initialize Firebase Admin SDK (graceful fallback)
+            try
+            {
+                var firebaseCredPath = builder.Configuration["Firebase:CredentialPath"];
+                if (!string.IsNullOrEmpty(firebaseCredPath) && File.Exists(firebaseCredPath))
+                {
+                    FirebaseApp.Create(new AppOptions
+                    {
+                        Credential = GoogleCredential.FromFile(firebaseCredPath)
+                    });
+                }
+            }
+            catch
+            {
+                // Firebase init failed - push notifications will be disabled
+            }
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
@@ -157,11 +209,15 @@ namespace MV.PresentationLayer
             // Serve static files (uploads)
             app.UseStaticFiles();
 
+            // CORS must be before Authentication
+            app.UseCors();
+
             // Authentication phải đứng trước Authorization
             app.UseAuthentication();
             app.UseAuthorization();
 
             app.MapControllers();
+            app.MapHub<ChatHub>("/chathub");
 
             app.Run();
         }

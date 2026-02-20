@@ -15,19 +15,22 @@ public class OrderService : IOrderService
     private readonly ICartRepository _cartRepository;
     private readonly IPaymentRepository _paymentRepository;
     private readonly IAdminRepository _adminRepository;
+    private readonly INotificationService _notificationService;
 
     public OrderService(
         ScamazonDbContext context,
         IOrderRepository orderRepository,
         ICartRepository cartRepository,
         IPaymentRepository paymentRepository,
-        IAdminRepository adminRepository)
+        IAdminRepository adminRepository,
+        INotificationService notificationService)
     {
         _context = context;
         _orderRepository = orderRepository;
         _cartRepository = cartRepository;
         _paymentRepository = paymentRepository;
         _adminRepository = adminRepository;
+        _notificationService = notificationService;
     }
 
     /// <summary>
@@ -332,6 +335,16 @@ public class OrderService : IOrderService
             NewData = $"{{\"status\": \"{status}\"}}",
             IpAddress = ipAddress
         });
+
+        // Send notification to customer
+        try
+        {
+            await _notificationService.SendOrderStatusNotificationAsync(order.UserId, order.OrderCode, status);
+        }
+        catch
+        {
+            // Don't fail order update if notification fails
+        }
 
         return new BaseResponseDto
         {
