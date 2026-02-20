@@ -118,15 +118,15 @@ public class AuthService : IAuthService
     /// </summary>
     public async Task<AuthResponseDto> LoginAsync(LoginRequestDto request, string? ipAddress)
     {
-        // 1. Tìm user theo username
-        var user = await _userRepository.GetByUsernameAsync(request.Username);
+        // 1. Tìm user theo email
+        var user = await _userRepository.GetByEmailAsync(request.Email);
 
         if (user == null)
         {
             return new AuthResponseDto
             {
                 Success = false,
-                Message = "Username hoặc mật khẩu không đúng"
+                Message = "Email hoặc mật khẩu không đúng"
             };
         }
 
@@ -136,7 +136,7 @@ public class AuthService : IAuthService
             return new AuthResponseDto
             {
                 Success = false,
-                Message = "Username hoặc mật khẩu không đúng"
+                Message = "Email hoặc mật khẩu không đúng"
             };
         }
 

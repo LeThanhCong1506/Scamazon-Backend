@@ -60,6 +60,15 @@ public class UserRepository : IUserRepository
     }
 
     /// <summary>
+    /// Lấy user theo email
+    /// </summary>
+    public async Task<User?> GetByEmailAsync(string email)
+    {
+        return await _context.Users
+            .FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == email.ToLower());
+    }
+
+    /// <summary>
     /// Lấy user theo id
     /// </summary>
     public async Task<User?> GetByIdAsync(int id)

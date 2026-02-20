@@ -7,8 +7,9 @@ namespace MV.DomainLayer.DTO.RequestModels;
 /// </summary>
 public class LoginRequestDto
 {
-    [Required(ErrorMessage = "Username là bắt buộc")]
-    public string Username { get; set; } = null!;
+    [Required(ErrorMessage = "Email là bắt buộc")]
+    [EmailAddress(ErrorMessage = "Email không hợp lệ")]
+    public string Email { get; set; } = null!;
 
     [Required(ErrorMessage = "Password là bắt buộc")]
     public string Password { get; set; } = null!;
