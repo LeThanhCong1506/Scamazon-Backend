@@ -418,3 +418,4 @@ FodyWeavers.xsd
 *.msp
 /.claude/settings.local.json
 /Scamazon.PresentationLayer/serviceAccountKey.json
+/Scamazon.PresentationLayer/appsettings.json
