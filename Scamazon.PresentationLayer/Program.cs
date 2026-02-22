@@ -220,6 +220,7 @@ namespace MV.PresentationLayer
 
             app.MapControllers();
             app.MapHub<ChatHub>("/chathub");
+            app.MapHub<AppHub>("/app-hub");
 
             app.Run();
         }

@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTO.RequestModels;
 using MV.DomainLayer.DTO.ResponseModels;
+using MV.PresentationLayer.Hubs;
 
 namespace MV.PresentationLayer.Controllers;
 
@@ -15,11 +17,13 @@ public class ProductsController : ControllerBase
 {
     private readonly IProductService _productService;
     private readonly IAdminService _adminService;
+    private readonly IHubContext<AppHub> _hubContext;
 
-    public ProductsController(IProductService productService, IAdminService adminService)
+    public ProductsController(IProductService productService, IAdminService adminService, IHubContext<AppHub> hubContext)
     {
         _productService = productService;
         _adminService = adminService;
+        _hubContext = hubContext;
     }
 
     /// <summary>
@@ -192,6 +196,10 @@ public class ProductsController : ControllerBase
         var userId = GetUserIdFromToken();
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
         var result = await _adminService.CreateProductAsync(request, userId, ipAddress);
+        if (result.Success)
+        {
+            await _hubContext.Clients.All.SendAsync("ProductUpdated");
+        }
         return Ok(result);
     }
 
@@ -212,6 +220,7 @@ public class ProductsController : ControllerBase
             return NotFound(result);
         }
 
+        await _hubContext.Clients.All.SendAsync("ProductUpdated");
         return Ok(result);
     }
 
@@ -232,6 +241,7 @@ public class ProductsController : ControllerBase
             return NotFound(result);
         }
 
+        await _hubContext.Clients.All.SendAsync("ProductUpdated");
         return Ok(result);
     }
 }

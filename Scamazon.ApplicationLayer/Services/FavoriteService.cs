@@ -29,6 +29,7 @@ public class FavoriteService : IFavoriteService
                 Id = f.Id,
                 ProductId = f.ProductId,
                 ProductName = f.Product.Name,
+                ProductSlug = f.Product.Slug,
                 ProductImage = primaryImage,
                 Price = f.Product.Price,
                 SalePrice = f.Product.SalePrice,
