@@ -80,6 +80,17 @@ public class ReviewRepository : IReviewRepository
     }
 
     /// <summary>
+    /// Kiểm tra user đã mua sản phẩm và đơn hàng đã giao chưa
+    /// </summary>
+    public async Task<bool> HasUserPurchasedProductAsync(int productId, int userId)
+    {
+        return await _context.OrderItems
+            .AnyAsync(oi => oi.ProductId == productId
+                && oi.Order.UserId == userId
+                && oi.Order.Status == "delivered");
+    }
+
+    /// <summary>
     /// Tạo review mới
     /// </summary>
     public async Task<ProductReview> CreateAsync(ProductReview review)

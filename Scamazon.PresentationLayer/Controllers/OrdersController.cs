@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTO.RequestModels;
 using MV.DomainLayer.DTO.ResponseModels;
+using MV.PresentationLayer.Hubs;
 
 namespace MV.PresentationLayer.Controllers;
 
@@ -14,10 +16,12 @@ namespace MV.PresentationLayer.Controllers;
 public class OrdersController : ControllerBase
 {
     private readonly IOrderService _orderService;
+    private readonly IHubContext<AppHub> _hubContext;
 
-    public OrdersController(IOrderService orderService)
+    public OrdersController(IOrderService orderService, IHubContext<AppHub> hubContext)
     {
         _orderService = orderService;
+        _hubContext = hubContext;
     }
 
     private int GetUserId() => int.Parse(User.FindFirst("user_id")!.Value);
@@ -36,6 +40,8 @@ public class OrdersController : ControllerBase
 
         var result = await _orderService.CreateOrderAsync(GetUserId(), request);
         if (!result.Success) return BadRequest(result);
+        
+        await _hubContext.Clients.All.SendAsync("OrderUpdated");
         return Ok(result);
     }
 
@@ -109,6 +115,8 @@ public class OrdersController : ControllerBase
         var result = await _orderService.UpdateOrderStatusAsync(id, request.Status, adminId, ipAddress);
 
         if (!result.Success) return BadRequest(result);
+
+        await _hubContext.Clients.All.SendAsync("OrderUpdated");
         return Ok(result);
     }
 }

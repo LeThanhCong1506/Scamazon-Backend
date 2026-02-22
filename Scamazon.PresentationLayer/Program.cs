@@ -47,6 +47,7 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IStoreRepository, StoreRepository>();
             builder.Services.AddScoped<IChatRepository, ChatRepository>();
             builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+            builder.Services.AddScoped<IFavoriteRepository, FavoriteRepository>();
 
             // Register Services
             builder.Services.AddScoped<IAuthService, AuthService>();
@@ -60,6 +61,7 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IStoreService, StoreService>();
             builder.Services.AddScoped<IChatService, ChatService>();
             builder.Services.AddScoped<INotificationService, NotificationService>();
+            builder.Services.AddScoped<IFavoriteService, FavoriteService>();
 
             // Configure CORS
             builder.Services.AddCors(options =>
@@ -218,6 +220,7 @@ namespace MV.PresentationLayer
 
             app.MapControllers();
             app.MapHub<ChatHub>("/chathub");
+            app.MapHub<AppHub>("/app-hub");
 
             app.Run();
         }
