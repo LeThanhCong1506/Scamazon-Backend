@@ -177,3 +177,25 @@ public class VNPayDataDto
 {
     public string PaymentUrl { get; set; } = null!;
 }
+
+// ==================== PAYMENT STATUS ====================
+
+/// <summary>
+/// Response kiểm tra trạng thái thanh toán (mobile polling)
+/// </summary>
+public class PaymentStatusResponseDto
+{
+    public bool Success { get; set; }
+    public string? Message { get; set; }
+    public PaymentStatusDataDto? Data { get; set; }
+}
+
+public class PaymentStatusDataDto
+{
+    public string OrderCode { get; set; } = null!;
+    public string PaymentStatus { get; set; } = null!; // pending, success, failed
+    public string OrderStatus { get; set; } = null!;
+    public string PaymentMethod { get; set; } = null!;
+    public decimal Amount { get; set; }
+    public DateTime? PaidAt { get; set; }
+}

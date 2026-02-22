@@ -59,17 +59,17 @@ public class PaymentsController : ControllerBase
 
     /// <summary>
     /// Kiểm tra trạng thái thanh toán (Mobile app dùng polling)
+    /// Mobile app gọi mỗi 3-5 giây sau khi hiển thị QR để biết khi nào thanh toán xong
     /// </summary>
     [HttpGet("status/{orderId}")]
     [Authorize]
-    [ProducesResponseType(typeof(BaseResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PaymentStatusResponseDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> CheckPaymentStatus(int orderId)
     {
-        // Simple check - mobile app gọi định kỳ để kiểm tra
         var userId = int.Parse(User.FindFirst("user_id")!.Value);
+        var result = await _paymentService.CheckPaymentStatusAsync(userId, orderId);
 
-        // Re-use the payment service to get status
-        // For now, return from controller directly
-        return Ok(new { Success = true, Message = "Endpoint ready" });
+        if (!result.Success) return NotFound(result);
+        return Ok(result);
     }
 }

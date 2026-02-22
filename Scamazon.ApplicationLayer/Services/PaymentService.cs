@@ -135,18 +135,14 @@ public class PaymentService : IPaymentService
         // Nội dung CK có thể chứa text thêm từ ngân hàng, nên ta tìm order_code pattern
         var payment = await _paymentRepository.GetByTransactionIdAsync(content.Trim());
 
-        // Nếu không tìm thấy chính xác, thử tìm order_code pattern "SCM..." trong content
+        // Nếu không tìm thấy chính xác, thử tìm order_code pattern "SCM..." trong content bằng Regex
         if (payment == null)
         {
-            // Tìm chuỗi bắt đầu bằng "SCM" trong content
-            var words = content.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            foreach (var word in words)
+            // Sử dụng Regex để tìm chuỗi bắt đầu bằng SCM và theo sau là các chữ số
+            var match = System.Text.RegularExpressions.Regex.Match(content, @"SCM\d+", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (match.Success)
             {
-                if (word.StartsWith("SCM", StringComparison.OrdinalIgnoreCase))
-                {
-                    payment = await _paymentRepository.GetByTransactionIdAsync(word.Trim());
-                    if (payment != null) break;
-                }
+                payment = await _paymentRepository.GetByTransactionIdAsync(match.Value);
             }
         }
 
@@ -183,5 +179,48 @@ public class PaymentService : IPaymentService
         await _orderRepository.UpdateOrderStatusAsync(payment.OrderId, "confirmed");
 
         return new BaseResponseDto { Success = true, Message = "Thanh toán thành công" };
+    }
+
+    /// <summary>
+    /// Kiểm tra trạng thái thanh toán - Mobile app dùng polling
+    /// Gọi định kỳ (mỗi 3-5s) sau khi hiển thị QR để biết khi nào thanh toán xong
+    /// </summary>
+    public async Task<PaymentStatusResponseDto> CheckPaymentStatusAsync(int userId, int orderId)
+    {
+        var payment = await _paymentRepository.GetByOrderIdAsync(orderId);
+
+        if (payment == null)
+        {
+            return new PaymentStatusResponseDto
+            {
+                Success = false,
+                Message = "Không tìm thấy thông tin thanh toán"
+            };
+        }
+
+        // Kiểm tra quyền sở hữu
+        if (payment.Order.UserId != userId)
+        {
+            return new PaymentStatusResponseDto
+            {
+                Success = false,
+                Message = "Không có quyền truy cập đơn hàng này"
+            };
+        }
+
+        return new PaymentStatusResponseDto
+        {
+            Success = true,
+            Message = payment.Status == "success" ? "Thanh toán thành công" : "Đang chờ thanh toán",
+            Data = new PaymentStatusDataDto
+            {
+                OrderCode = payment.Order.OrderCode,
+                PaymentStatus = payment.Status ?? "pending",
+                OrderStatus = payment.Order.Status ?? "pending",
+                PaymentMethod = payment.PaymentMethod,
+                Amount = payment.Amount,
+                PaidAt = payment.PaidAt
+            }
+        };
     }
 }
