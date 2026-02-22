@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTO.RequestModels;
+using MV.DomainLayer.DTO.ResponseModels;
 using MV.PresentationLayer.Hubs;
 
 namespace MV.PresentationLayer.Controllers;
@@ -14,12 +15,45 @@ public class ChatController : ControllerBase
     private readonly IChatService _chatService;
     private readonly INotificationService _notificationService;
     private readonly IHubContext<ChatHub> _hubContext;
+    private readonly ICloudinaryService _cloudinaryService;
 
-    public ChatController(IChatService chatService, INotificationService notificationService, IHubContext<ChatHub> hubContext)
+    public ChatController(IChatService chatService, INotificationService notificationService, IHubContext<ChatHub> hubContext, ICloudinaryService cloudinaryService)
     {
         _chatService = chatService;
         _notificationService = notificationService;
         _hubContext = hubContext;
+        _cloudinaryService = cloudinaryService;
+    }
+
+    /// <summary>
+    /// Upload ảnh cho chat (bất kỳ user đã đăng nhập)
+    /// </summary>
+    [HttpPost("chat/upload")]
+    [Authorize]
+    public async Task<IActionResult> UploadChatImage(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(new BaseResponseDto { Success = false, Message = "File không được để trống" });
+
+        var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+        if (!allowedTypes.Contains(file.ContentType))
+            return BadRequest(new BaseResponseDto { Success = false, Message = "Chỉ hỗ trợ file ảnh (JPEG, PNG, GIF, WebP)" });
+
+        try
+        {
+            using var stream = file.OpenReadStream();
+            var url = await _cloudinaryService.UploadImageAsync(stream, file.FileName);
+            return Ok(new UploadResponseDto
+            {
+                Success = true,
+                Message = "Upload thành công",
+                Data = new UploadDataDto { Url = url, FileName = file.FileName }
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new BaseResponseDto { Success = false, Message = $"Upload thất bại: {ex.Message}" });
+        }
     }
 
     [HttpPost("chat/start")]
