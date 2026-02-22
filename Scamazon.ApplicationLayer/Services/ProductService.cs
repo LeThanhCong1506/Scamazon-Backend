@@ -301,6 +301,17 @@ public class ProductService : IProductService
             };
         }
 
+        // Check if user has purchased this product with a delivered order
+        var hasPurchased = await _reviewRepository.HasUserPurchasedProductAsync(productId, userId);
+        if (!hasPurchased)
+        {
+            return new CreateReviewResponseDto
+            {
+                Success = false,
+                Message = "Bạn cần mua và nhận sản phẩm trước khi đánh giá"
+            };
+        }
+
         // Check if user already reviewed
         var hasReviewed = await _reviewRepository.HasUserReviewedAsync(productId, userId);
         if (hasReviewed)

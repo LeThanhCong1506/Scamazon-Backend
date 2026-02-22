@@ -23,6 +23,11 @@ public interface IReviewRepository
     Task<bool> HasUserReviewedAsync(int productId, int userId);
 
     /// <summary>
+    /// Kiểm tra user đã mua sản phẩm và đơn hàng đã giao chưa
+    /// </summary>
+    Task<bool> HasUserPurchasedProductAsync(int productId, int userId);
+
+    /// <summary>
     /// Tạo review mới
     /// </summary>
     Task<ProductReview> CreateAsync(ProductReview review);
