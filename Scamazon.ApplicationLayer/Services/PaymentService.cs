@@ -135,18 +135,14 @@ public class PaymentService : IPaymentService
         // Nội dung CK có thể chứa text thêm từ ngân hàng, nên ta tìm order_code pattern
         var payment = await _paymentRepository.GetByTransactionIdAsync(content.Trim());
 
-        // Nếu không tìm thấy chính xác, thử tìm order_code pattern "SCM..." trong content
+        // Nếu không tìm thấy chính xác, thử tìm order_code pattern "SCM..." trong content bằng Regex
         if (payment == null)
         {
-            // Tìm chuỗi bắt đầu bằng "SCM" trong content
-            var words = content.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            foreach (var word in words)
+            // Sử dụng Regex để tìm chuỗi bắt đầu bằng SCM và theo sau là các chữ số
+            var match = System.Text.RegularExpressions.Regex.Match(content, @"SCM\d+", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (match.Success)
             {
-                if (word.StartsWith("SCM", StringComparison.OrdinalIgnoreCase))
-                {
-                    payment = await _paymentRepository.GetByTransactionIdAsync(word.Trim());
-                    if (payment != null) break;
-                }
+                payment = await _paymentRepository.GetByTransactionIdAsync(match.Value);
             }
         }
 
