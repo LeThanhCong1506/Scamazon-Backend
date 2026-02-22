@@ -52,6 +52,8 @@ public partial class ScamazonDbContext : DbContext
 
     public virtual DbSet<VProductsWithRating> VProductsWithRatings { get; set; }
 
+    public virtual DbSet<Favorite> Favorites { get; set; }
+
     public virtual DbSet<VUserCartCount> VUserCartCounts { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -635,6 +637,33 @@ public partial class ScamazonDbContext : DbContext
             entity.HasOne(d => d.User).WithMany(p => p.ProductReviews)
                 .HasForeignKey(d => d.UserId)
                 .HasConstraintName("product_reviews_user_id_fkey");
+        });
+
+        modelBuilder.Entity<Favorite>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("favorites_pkey");
+
+            entity.ToTable("favorites", tb => tb.HasComment("Danh sách yêu thích - Wishlist"));
+
+            entity.HasIndex(e => new { e.UserId, e.ProductId }, "favorites_user_id_product_id_key").IsUnique();
+
+            entity.HasIndex(e => e.UserId, "idx_favorites_user");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("created_at");
+
+            entity.HasOne(d => d.User).WithMany(p => p.Favorites)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("favorites_user_id_fkey");
+
+            entity.HasOne(d => d.Product).WithMany(p => p.Favorites)
+                .HasForeignKey(d => d.ProductId)
+                .HasConstraintName("favorites_product_id_fkey");
         });
 
         modelBuilder.Entity<Store>(entity =>
