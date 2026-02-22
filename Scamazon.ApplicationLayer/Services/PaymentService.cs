@@ -184,4 +184,47 @@ public class PaymentService : IPaymentService
 
         return new BaseResponseDto { Success = true, Message = "Thanh toán thành công" };
     }
+
+    /// <summary>
+    /// Kiểm tra trạng thái thanh toán - Mobile app dùng polling
+    /// Gọi định kỳ (mỗi 3-5s) sau khi hiển thị QR để biết khi nào thanh toán xong
+    /// </summary>
+    public async Task<PaymentStatusResponseDto> CheckPaymentStatusAsync(int userId, int orderId)
+    {
+        var payment = await _paymentRepository.GetByOrderIdAsync(orderId);
+
+        if (payment == null)
+        {
+            return new PaymentStatusResponseDto
+            {
+                Success = false,
+                Message = "Không tìm thấy thông tin thanh toán"
+            };
+        }
+
+        // Kiểm tra quyền sở hữu
+        if (payment.Order.UserId != userId)
+        {
+            return new PaymentStatusResponseDto
+            {
+                Success = false,
+                Message = "Không có quyền truy cập đơn hàng này"
+            };
+        }
+
+        return new PaymentStatusResponseDto
+        {
+            Success = true,
+            Message = payment.Status == "success" ? "Thanh toán thành công" : "Đang chờ thanh toán",
+            Data = new PaymentStatusDataDto
+            {
+                OrderCode = payment.Order.OrderCode,
+                PaymentStatus = payment.Status ?? "pending",
+                OrderStatus = payment.Order.Status ?? "pending",
+                PaymentMethod = payment.PaymentMethod,
+                Amount = payment.Amount,
+                PaidAt = payment.PaidAt
+            }
+        };
+    }
 }

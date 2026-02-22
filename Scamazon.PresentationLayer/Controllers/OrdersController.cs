@@ -82,6 +82,19 @@ public class OrdersController : ControllerBase
     }
 
     /// <summary>
+    /// [Admin] Chi tiết đơn hàng (không check userId)
+    /// </summary>
+    [HttpGet("admin/orders/{id}")]
+    [Authorize(Roles = "admin")]
+    [ProducesResponseType(typeof(OrderDetailResponseDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAdminOrderDetail(int id)
+    {
+        var result = await _orderService.GetAdminOrderDetailAsync(id);
+        if (!result.Success) return NotFound(result);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// [Admin] Cập nhật trạng thái đơn hàng
     /// </summary>
     [HttpPut("admin/orders/{id}/status")]

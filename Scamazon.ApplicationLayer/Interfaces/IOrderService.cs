@@ -9,5 +9,6 @@ public interface IOrderService
     Task<OrderListResponseDto> GetMyOrdersAsync(int userId);
     Task<OrderDetailResponseDto> GetOrderDetailAsync(int userId, int orderId);
     Task<AdminOrderListResponseDto> GetAllOrdersAsync(int page, int limit, string? status);
+    Task<OrderDetailResponseDto> GetAdminOrderDetailAsync(int orderId);
     Task<BaseResponseDto> UpdateOrderStatusAsync(int orderId, string status, int adminId, string? ipAddress);
 }

@@ -297,6 +297,66 @@ public class OrderService : IOrderService
     }
 
     /// <summary>
+    /// [Admin] Chi tiết đơn hàng - không check userId ownership
+    /// </summary>
+    public async Task<OrderDetailResponseDto> GetAdminOrderDetailAsync(int orderId)
+    {
+        var order = await _orderRepository.GetOrderDetailAsync(orderId);
+
+        if (order == null)
+        {
+            return new OrderDetailResponseDto
+            {
+                Success = false,
+                Message = "Không tìm thấy đơn hàng"
+            };
+        }
+
+        var payment = order.Payments.FirstOrDefault();
+
+        return new OrderDetailResponseDto
+        {
+            Success = true,
+            Data = new OrderDetailDataDto
+            {
+                Id = order.Id,
+                OrderCode = order.OrderCode,
+                ShippingName = order.ShippingName,
+                ShippingPhone = order.ShippingPhone,
+                ShippingAddress = order.ShippingAddress,
+                ShippingCity = order.ShippingCity,
+                ShippingDistrict = order.ShippingDistrict,
+                ShippingWard = order.ShippingWard,
+                Subtotal = order.Subtotal,
+                ShippingFee = order.ShippingFee ?? 0,
+                Discount = order.Discount ?? 0,
+                Total = order.Total,
+                Status = order.Status,
+                Note = order.Note,
+                CreatedAt = order.CreatedAt,
+                Items = order.OrderItems.Select(oi => new OrderItemDto
+                {
+                    Id = oi.Id,
+                    ProductId = oi.ProductId,
+                    ProductName = oi.ProductName,
+                    ProductImage = oi.ProductImage,
+                    Price = oi.Price,
+                    Quantity = oi.Quantity,
+                    Subtotal = oi.Subtotal
+                }).ToList(),
+                Payment = payment != null ? new PaymentInfoDto
+                {
+                    PaymentMethod = payment.PaymentMethod,
+                    Amount = payment.Amount,
+                    Status = payment.Status,
+                    TransactionId = payment.TransactionId,
+                    PaidAt = payment.PaidAt
+                } : null
+            }
+        };
+    }
+
+    /// <summary>
     /// [Admin] Cập nhật trạng thái đơn hàng
     /// </summary>
     public async Task<BaseResponseDto> UpdateOrderStatusAsync(int orderId, string status, int adminId, string? ipAddress)
