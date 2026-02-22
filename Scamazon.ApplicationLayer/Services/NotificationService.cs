@@ -12,11 +12,16 @@ namespace MV.ApplicationLayer.Services;
 public class NotificationService : INotificationService
 {
     private readonly INotificationRepository _notificationRepository;
+    private readonly IRealtimeNotifier _realtimeNotifier;
     private readonly ILogger<NotificationService> _logger;
 
-    public NotificationService(INotificationRepository notificationRepository, ILogger<NotificationService> logger)
+    public NotificationService(
+        INotificationRepository notificationRepository,
+        IRealtimeNotifier realtimeNotifier,
+        ILogger<NotificationService> logger)
     {
         _notificationRepository = notificationRepository;
+        _realtimeNotifier = realtimeNotifier;
         _logger = logger;
     }
 
@@ -57,6 +62,9 @@ public class NotificationService : INotificationService
         };
 
         await _notificationRepository.CreateNotificationAsync(notification);
+
+        // Realtime via SignalR
+        await SendRealtimeAsync(request.UserId, notification);
 
         // Push via FCM
         await SendPushNotificationAsync(request.UserId, request.Title, request.Body ?? "", null);
@@ -123,6 +131,11 @@ public class NotificationService : INotificationService
         };
 
         await _notificationRepository.CreateNotificationAsync(notification);
+
+        // Realtime via SignalR
+        await SendRealtimeAsync(userId, notification);
+
+        // Push via FCM
         await SendPushNotificationAsync(userId, title, statusMessage, new Dictionary<string, string>
         {
             { "type", "order_status" },
@@ -150,6 +163,11 @@ public class NotificationService : INotificationService
         };
 
         await _notificationRepository.CreateNotificationAsync(notification);
+
+        // Realtime via SignalR
+        await SendRealtimeAsync(userId, notification);
+
+        // Push via FCM
         await SendPushNotificationAsync(userId, title, body, new Dictionary<string, string>
         {
             { "type", "chat" },
@@ -175,5 +193,25 @@ public class NotificationService : INotificationService
             Success = true,
             Message = "Đã đánh dấu tất cả đã đọc"
         };
+    }
+
+    /// <summary>
+    /// Helper: gửi notification realtime qua SignalR.
+    /// Client lắng nghe event "ReceiveNotification".
+    /// </summary>
+    private async Task SendRealtimeAsync(int userId, Notification notification)
+    {
+        var payload = new NotificationDto
+        {
+            Id = notification.Id,
+            Type = notification.Type,
+            Title = notification.Title,
+            Body = notification.Body,
+            Data = notification.Data,
+            IsRead = notification.IsRead,
+            CreatedAt = notification.CreatedAt
+        };
+
+        await _realtimeNotifier.SendToUserAsync(userId, "ReceiveNotification", payload);
     }
 }

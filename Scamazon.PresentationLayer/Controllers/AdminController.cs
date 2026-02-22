@@ -15,10 +15,12 @@ namespace MV.PresentationLayer.Controllers;
 public class AdminController : ControllerBase
 {
     private readonly IAdminService _adminService;
+    private readonly ICloudinaryService _cloudinaryService;
 
-    public AdminController(IAdminService adminService)
+    public AdminController(IAdminService adminService, ICloudinaryService cloudinaryService)
     {
         _adminService = adminService;
+        _cloudinaryService = cloudinaryService;
     }
 
     /// <summary>
@@ -60,47 +62,30 @@ public class AdminController : ControllerBase
             });
         }
 
-        // Validate file size (5MB max)
-        if (file.Length > 5 * 1024 * 1024)
+        try
         {
-            return BadRequest(new BaseResponseDto
+            var fileName = file.FileName;
+            using var stream = file.OpenReadStream();
+            var url = await _cloudinaryService.UploadImageAsync(stream, fileName);
+
+            return Ok(new UploadResponseDto
             {
-                Success = false,
-                Message = "Kích thước file tối đa 5MB"
+                Success = true,
+                Message = "Upload ảnh thành công",
+                Data = new UploadDataDto
+                {
+                    Url = url,
+                    FileName = fileName
+                }
             });
         }
-
-        // Generate unique filename
-        var extension = Path.GetExtension(file.FileName);
-        var fileName = $"{Guid.NewGuid()}{extension}";
-        var uploadsPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
-
-        // Create directory if not exists
-        if (!Directory.Exists(uploadsPath))
+        catch (Exception ex)
         {
-            Directory.CreateDirectory(uploadsPath);
+            return StatusCode(500, new BaseResponseDto 
+            { 
+                Success = false, 
+                Message = $"Upload thất bại: {ex.Message}" 
+            });
         }
-
-        var filePath = Path.Combine(uploadsPath, fileName);
-
-        using (var stream = new FileStream(filePath, FileMode.Create))
-        {
-            await file.CopyToAsync(stream);
-        }
-
-        // Build URL
-        var baseUrl = $"{Request.Scheme}://{Request.Host}";
-        var fileUrl = $"{baseUrl}/uploads/{fileName}";
-
-        return Ok(new UploadResponseDto
-        {
-            Success = true,
-            Message = "Upload ảnh thành công",
-            Data = new UploadDataDto
-            {
-                Url = fileUrl,
-                FileName = fileName
-            }
-        });
     }
 }
