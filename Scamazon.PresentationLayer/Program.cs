@@ -62,6 +62,7 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IChatService, ChatService>();
             builder.Services.AddScoped<INotificationService, NotificationService>();
             builder.Services.AddScoped<IFavoriteService, FavoriteService>();
+            builder.Services.AddSingleton<ICloudinaryService, CloudinaryService>();
 
             // Configure CORS
             builder.Services.AddCors(options =>
