@@ -11,6 +11,7 @@ using MV.InfrastructureLayer.DBContexts;
 using MV.InfrastructureLayer.Interfaces;
 using MV.InfrastructureLayer.Repositories;
 using MV.PresentationLayer.Hubs;
+using MV.PresentationLayer.Services;
 
 namespace MV.PresentationLayer
 {
@@ -61,6 +62,7 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IStoreService, StoreService>();
             builder.Services.AddScoped<IChatService, ChatService>();
             builder.Services.AddScoped<INotificationService, NotificationService>();
+            builder.Services.AddSingleton<IRealtimeNotifier, SignalRRealtimeNotifier>();
             builder.Services.AddScoped<IFavoriteService, FavoriteService>();
             builder.Services.AddSingleton<ICloudinaryService, CloudinaryService>();
 
@@ -106,7 +108,8 @@ namespace MV.PresentationLayer
                         // Read access_token from query string for SignalR WebSocket
                         var accessToken = context.Request.Query["access_token"];
                         var path = context.HttpContext.Request.Path;
-                        if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/chathub"))
+                        if (!string.IsNullOrEmpty(accessToken) &&
+                            (path.StartsWithSegments("/chathub") || path.StartsWithSegments("/app-hub")))
                         {
                             context.Token = accessToken;
                         }
