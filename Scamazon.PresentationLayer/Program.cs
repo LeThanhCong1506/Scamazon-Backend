@@ -10,6 +10,7 @@ using MV.ApplicationLayer.Services;
 using MV.InfrastructureLayer.DBContexts;
 using MV.InfrastructureLayer.Interfaces;
 using MV.InfrastructureLayer.Repositories;
+using MV.InfrastructureLayer.Services;
 using MV.PresentationLayer.Hubs;
 using MV.PresentationLayer.Services;
 
@@ -49,6 +50,7 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IChatRepository, ChatRepository>();
             builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
             builder.Services.AddScoped<IFavoriteRepository, FavoriteRepository>();
+            builder.Services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepository>();
 
             // Register Services
             builder.Services.AddScoped<IAuthService, AuthService>();
@@ -65,6 +67,7 @@ namespace MV.PresentationLayer
             builder.Services.AddSingleton<IRealtimeNotifier, SignalRRealtimeNotifier>();
             builder.Services.AddScoped<IFavoriteService, FavoriteService>();
             builder.Services.AddSingleton<ICloudinaryService, CloudinaryService>();
+            builder.Services.AddScoped<IEmailService, EmailService>();
 
             // Configure CORS
             builder.Services.AddCors(options =>

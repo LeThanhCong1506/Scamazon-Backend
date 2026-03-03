@@ -37,4 +37,19 @@ public interface IAuthService
     /// Cập nhật profile của user
     /// </summary>
     Task<ProfileResponseDto> UpdateProfileAsync(int userId, UpdateProfileRequestDto request);
+
+    /// <summary>
+    /// Gửi OTP đặt lại mật khẩu qua email
+    /// </summary>
+    Task<BaseResponseDto> ForgotPasswordAsync(ForgotPasswordRequestDto request);
+
+    /// <summary>
+    /// Xác minh OTP đặt lại mật khẩu
+    /// </summary>
+    Task<BaseResponseDto> VerifyOtpAsync(VerifyOtpRequestDto request);
+
+    /// <summary>
+    /// Đặt lại mật khẩu sau khi xác minh OTP
+    /// </summary>
+    Task<BaseResponseDto> ResetPasswordAsync(ResetPasswordRequestDto request);
 }
