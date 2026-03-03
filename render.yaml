@@ -1,0 +1,86 @@
+# render.yaml - Infrastructure as Code cho Render.com
+# Docs: https://render.com/docs/infrastructure-as-code
+
+services:
+  - type: web
+    name: scamazon-backend
+    env: docker
+    # Dockerfile ở root của repo
+    dockerfilePath: ./Dockerfile
+    # Branch để deploy
+    branch: main
+    # Render free plan (đổi thành 'starter' nếu cần nhiều tài nguyên hơn)
+    plan: free
+
+    # Health check để Render biết app đã ready
+    healthCheckPath: /health
+
+    envVars:
+      # ── ASP.NET Core ──────────────────────────────────────────
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+
+      - key: ASPNETCORE_URLS
+        value: http://+:8080
+
+      # ── Database (tự động lấy từ PostgreSQL service bên dưới) ──
+      - key: ConnectionStrings__DefaultConnection
+        fromDatabase:
+          name: scamazon-db
+          property: connectionString
+
+      # ── Redis (dùng Upstash free hoặc Render Redis) ───────────
+      # Uncomment nếu dùng Redis:
+      # - key: ConnectionStrings__RedisConnection
+      #   sync: false  # Điền thủ công trong dashboard
+
+      # ── JWT ───────────────────────────────────────────────────
+      - key: JwtSettings__SecretKey
+        sync: false  # Điền thủ công trong Render dashboard
+      - key: JwtSettings__Issuer
+        value: Scamazon
+      - key: JwtSettings__Audience
+        value: ScamazonApp
+      - key: JwtSettings__ExpirationDays
+        value: "7"
+
+      # ── Cloudinary ────────────────────────────────────────────
+      - key: Cloudinary__CloudName
+        value: dte9cph6w
+      - key: Cloudinary__ApiKey
+        sync: false  # Điền thủ công
+      - key: Cloudinary__ApiSecret
+        sync: false  # Điền thủ công
+
+      # ── Email (SMTP) ──────────────────────────────────────────
+      - key: Smtp__Host
+        value: smtp.gmail.com
+      - key: Smtp__Port
+        value: "587"
+      - key: Smtp__Username
+        sync: false  # Điền thủ công
+      - key: Smtp__Password
+        sync: false  # Điền thủ công (App Password Gmail)
+      - key: Smtp__SenderEmail
+        sync: false
+      - key: Smtp__SenderName
+        value: Scamazon
+
+      # ── SePay ─────────────────────────────────────────────────
+      - key: SePay__BankAccount
+        value: "0924024112005"
+      - key: SePay__BankName
+        value: MBBank
+      - key: SePay__AccountName
+        value: LE MINH THU
+
+      # ── Firebase (để trống = Firebase disabled, app vẫn chạy) ──
+      - key: Firebase__CredentialPath
+        value: ""
+
+# ── PostgreSQL Database ────────────────────────────────────────
+databases:
+  - name: scamazon-db
+    databaseName: scamazon
+    user: scamazon_user
+    plan: free  # Free tier bị xoá sau 90 ngày, nâng cấp để giữ data
