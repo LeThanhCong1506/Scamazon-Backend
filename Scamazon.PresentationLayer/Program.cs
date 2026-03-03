@@ -206,14 +206,26 @@ namespace MV.PresentationLayer
 
             var app = builder.Build();
 
-            // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
+            // Auto-migrate database khi khởi động (cần thiết cho production deployment)
+            using (var scope = app.Services.CreateScope())
             {
-                app.UseSwagger();
-                app.UseSwaggerUI();
+                var db = scope.ServiceProvider.GetRequiredService<ScamazonDbContext>();
+                db.Database.Migrate();
             }
 
-            app.UseHttpsRedirection();
+            // Configure the HTTP request pipeline.
+            // Swagger luôn bật để dễ test (bỏ nếu muốn ẩn ở production)
+            app.UseSwagger();
+            app.UseSwaggerUI();
+
+            // HTTPS redirect: chỉ bật ở Development vì Render xử lý SSL ở proxy level
+            if (app.Environment.IsDevelopment())
+            {
+                app.UseHttpsRedirection();
+            }
+
+            // Health check endpoint cho Render
+            app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
             // Serve static files (uploads)
             app.UseStaticFiles();
