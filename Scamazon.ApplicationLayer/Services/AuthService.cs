@@ -8,6 +8,7 @@ using MV.DomainLayer.DTO.RequestModels;
 using MV.DomainLayer.DTO.ResponseModels;
 using MV.DomainLayer.Entities;
 using MV.InfrastructureLayer.Interfaces;
+using BCryptNet = BCrypt.Net.BCrypt;
 
 namespace MV.ApplicationLayer.Services;
 
@@ -19,12 +20,21 @@ public class AuthService : IAuthService
     private readonly IUserRepository _userRepository;
     private readonly IAdminRepository _adminRepository;
     private readonly IConfiguration _configuration;
+    private readonly IPasswordResetTokenRepository _passwordResetTokenRepository;
+    private readonly IEmailService _emailService;
 
-    public AuthService(IUserRepository userRepository, IAdminRepository adminRepository, IConfiguration configuration)
+    public AuthService(
+        IUserRepository userRepository,
+        IAdminRepository adminRepository,
+        IConfiguration configuration,
+        IPasswordResetTokenRepository passwordResetTokenRepository,
+        IEmailService emailService)
     {
         _userRepository = userRepository;
         _adminRepository = adminRepository;
         _configuration = configuration;
+        _passwordResetTokenRepository = passwordResetTokenRepository;
+        _emailService = emailService;
     }
 
 
@@ -353,6 +363,113 @@ public class AuthService : IAuthService
                 Ward = updatedUser.Ward,
                 CreatedAt = updatedUser.CreatedAt
             }
+        };
+    }
+
+    /// <summary>
+    /// Gửi OTP đặt lại mật khẩu qua email
+    /// </summary>
+    public async Task<BaseResponseDto> ForgotPasswordAsync(ForgotPasswordRequestDto request)
+    {
+        var user = await _userRepository.GetByEmailAsync(request.Email);
+        if (user == null)
+        {
+            // Trả về success để không lộ thông tin email có tồn tại hay không
+            return new BaseResponseDto
+            {
+                Success = true,
+                Message = "Nếu email tồn tại, mã OTP sẽ được gửi đến email của bạn"
+            };
+        }
+
+        // Vô hiệu hóa OTP cũ
+        await _passwordResetTokenRepository.InvalidateOldOtpsAsync(request.Email);
+
+        // Tạo OTP 6 chữ số
+        var otp = new Random().Next(100000, 999999).ToString();
+
+        // Lưu OTP vào database (hết hạn sau 15 phút)
+        var resetToken = new PasswordResetToken
+        {
+            UserId = user.Id,
+            Email = request.Email,
+            Otp = otp,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(15),
+            IsUsed = false,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _passwordResetTokenRepository.SaveOtpAsync(resetToken);
+
+        // Gửi email
+        await _emailService.SendOtpEmailAsync(request.Email, otp);
+
+        return new BaseResponseDto
+        {
+            Success = true,
+            Message = "Nếu email tồn tại, mã OTP sẽ được gửi đến email của bạn"
+        };
+    }
+
+    /// <summary>
+    /// Xác minh OTP đặt lại mật khẩu
+    /// </summary>
+    public async Task<BaseResponseDto> VerifyOtpAsync(VerifyOtpRequestDto request)
+    {
+        var token = await _passwordResetTokenRepository.GetValidOtpAsync(request.Email, request.Otp);
+        if (token == null)
+        {
+            return new BaseResponseDto
+            {
+                Success = false,
+                Message = "Mã OTP không hợp lệ hoặc đã hết hạn"
+            };
+        }
+
+        return new BaseResponseDto
+        {
+            Success = true,
+            Message = "Xác minh OTP thành công"
+        };
+    }
+
+    /// <summary>
+    /// Đặt lại mật khẩu sau khi xác minh OTP
+    /// </summary>
+    public async Task<BaseResponseDto> ResetPasswordAsync(ResetPasswordRequestDto request)
+    {
+        var token = await _passwordResetTokenRepository.GetValidOtpAsync(request.Email, request.Otp);
+        if (token == null)
+        {
+            return new BaseResponseDto
+            {
+                Success = false,
+                Message = "Mã OTP không hợp lệ hoặc đã hết hạn"
+            };
+        }
+
+        var user = await _userRepository.GetByEmailAsync(request.Email);
+        if (user == null)
+        {
+            return new BaseResponseDto
+            {
+                Success = false,
+                Message = "Không tìm thấy tài khoản"
+            };
+        }
+
+        // Cập nhật mật khẩu mới
+        user.PasswordHash = BCryptNet.HashPassword(request.NewPassword, workFactor: 10);
+        user.UpdatedAt = DateTime.UtcNow;
+        await _userRepository.UpdateUserAsync(user);
+
+        // Đánh dấu OTP đã sử dụng
+        await _passwordResetTokenRepository.MarkAsUsedAsync(token);
+
+        return new BaseResponseDto
+        {
+            Success = true,
+            Message = "Đặt lại mật khẩu thành công"
         };
     }
 }

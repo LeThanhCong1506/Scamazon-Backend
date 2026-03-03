@@ -235,4 +235,51 @@ public class AuthController : ControllerBase
 
         return Ok(result);
     }
+
+    /// <summary>
+    /// Gửi OTP đặt lại mật khẩu đến email
+    /// </summary>
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequestDto request)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(new { Success = false, Message = "Dữ liệu không hợp lệ" });
+
+        var result = await _authService.ForgotPasswordAsync(request);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Xác minh OTP đặt lại mật khẩu
+    /// </summary>
+    [HttpPost("verify-otp")]
+    public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpRequestDto request)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(new { Success = false, Message = "Dữ liệu không hợp lệ" });
+
+        var result = await _authService.VerifyOtpAsync(request);
+
+        if (!result.Success)
+            return BadRequest(result);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Đặt lại mật khẩu mới
+    /// </summary>
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequestDto request)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(new { Success = false, Message = "Dữ liệu không hợp lệ" });
+
+        var result = await _authService.ResetPasswordAsync(request);
+
+        if (!result.Success)
+            return BadRequest(result);
+
+        return Ok(result);
+    }
 }

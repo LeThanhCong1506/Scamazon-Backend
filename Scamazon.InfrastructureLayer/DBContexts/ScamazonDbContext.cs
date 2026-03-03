@@ -56,6 +56,8 @@ public partial class ScamazonDbContext : DbContext
 
     public virtual DbSet<VUserCartCount> VUserCartCounts { get; set; }
 
+    public virtual DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AdminActivityLog>(entity =>
@@ -809,6 +811,40 @@ public partial class ScamazonDbContext : DbContext
 
             entity.Property(e => e.CartItemCount).HasColumnName("cart_item_count");
             entity.Property(e => e.UserId).HasColumnName("user_id");
+        });
+
+        modelBuilder.Entity<PasswordResetToken>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("password_reset_tokens_pkey");
+
+            entity.ToTable("password_reset_tokens");
+
+            entity.HasIndex(e => e.Email, "idx_password_reset_tokens_email");
+            entity.HasIndex(e => new { e.Email, e.Otp }, "idx_password_reset_tokens_email_otp");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Email)
+                .HasMaxLength(100)
+                .HasColumnName("email");
+            entity.Property(e => e.Otp)
+                .HasMaxLength(6)
+                .HasColumnName("otp");
+            entity.Property(e => e.ExpiresAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("expires_at");
+            entity.Property(e => e.IsUsed)
+                .HasDefaultValue(false)
+                .HasColumnName("is_used");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("created_at");
+
+            entity.HasOne(d => d.User).WithMany(p => p.PasswordResetTokens)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("password_reset_tokens_user_id_fkey");
         });
 
         OnModelCreatingPartial(modelBuilder);
