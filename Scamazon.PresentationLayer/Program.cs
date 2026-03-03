@@ -146,21 +146,56 @@ namespace MV.PresentationLayer
                 };
             });
 
-            // Initialize Firebase Admin SDK (graceful fallback)
+            // Initialize Firebase Admin SDK
             try
             {
+                // Production: đọc từ env variable (JSON content của serviceAccountKey.json)
+                var firebaseJson = builder.Configuration["Firebase:CredentialJson"];
+                // Development: đọc từ file local
                 var firebaseCredPath = builder.Configuration["Firebase:CredentialPath"];
-                if (!string.IsNullOrEmpty(firebaseCredPath) && File.Exists(firebaseCredPath))
+
+                if (!string.IsNullOrEmpty(firebaseJson))
+                {
+                    FirebaseApp.Create(new AppOptions
+                    {
+                        Credential = GoogleCredential.FromJson(firebaseJson)
+                    });
+                    Console.WriteLine("Firebase initialized from environment variable.");
+                }
+                else if (!string.IsNullOrEmpty(firebaseCredPath) && File.Exists(firebaseCredPath))
                 {
                     FirebaseApp.Create(new AppOptions
                     {
                         Credential = GoogleCredential.FromFile(firebaseCredPath)
                     });
+                    Console.WriteLine("Firebase initialized from file.");
+                }
+                else
+                {
+                    Console.WriteLine("Firebase credentials not found - push notifications will be disabled.");
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Firebase init failed - push notifications will be disabled: {ex.Message}");
+            }
+
+            // Redis Cache (chỉ đăng ký nếu có connection string)
+            var redisConnection = builder.Configuration.GetConnectionString("RedisConnection");
+            if (!string.IsNullOrEmpty(redisConnection))
+            {
+                builder.Services.AddStackExchangeRedisCache(options =>
+                {
+                    options.Configuration = redisConnection;
+                    options.InstanceName = "Scamazon:";
+                });
+                Console.WriteLine("Redis cache registered.");
+            }
+            else
+            {
+                // Fallback: dùng in-memory cache nếu không có Redis
+                builder.Services.AddDistributedMemoryCache();
+                Console.WriteLine("Redis not configured - using in-memory cache as fallback.");
             }
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
