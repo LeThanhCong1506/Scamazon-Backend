@@ -237,6 +237,41 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+    /// Upload avatar cho user hiện tại (lưu lên Cloudinary)
+    /// </summary>
+    /// <param name="file">File ảnh avatar</param>
+    /// <returns>Profile data đã cập nhật với avatarUrl mới</returns>
+    /// <response code="200">Upload thành công</response>
+    /// <response code="400">File không hợp lệ</response>
+    /// <response code="401">Chưa đăng nhập</response>
+    [HttpPost("profile/avatar")]
+    [Authorize]
+    [ProducesResponseType(typeof(ProfileResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProfileResponseDto), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> UploadAvatar(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest(new ProfileResponseDto
+            {
+                Success = false,
+                Message = "Vui lòng chọn file ảnh"
+            });
+        }
+
+        var userId = GetUserIdFromToken();
+        var result = await _authService.UploadAvatarAsync(userId, file);
+
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Gửi OTP đặt lại mật khẩu đến email
     /// </summary>
     [HttpPost("forgot-password")]
