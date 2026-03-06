@@ -74,6 +74,16 @@ public class PaymentService : IPaymentService
         var bankName = sepaySection["BankName"] ?? "MBBank";
         var accountName = sepaySection["AccountName"] ?? "";
 
+        // Validate required config
+        if (string.IsNullOrWhiteSpace(bankAccount))
+        {
+            return new VNPayResponseDto
+            {
+                Success = false,
+                Message = "Chưa cấu hình tài khoản ngân hàng (SePay:BankAccount). Vui lòng liên hệ admin."
+            };
+        }
+
         // Nội dung CK = order_code (để SePay webhook match)
         var transferContent = payment.Order.OrderCode;
         var amount = (long)payment.Amount;
