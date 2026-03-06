@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using MV.DomainLayer.DTO.RequestModels;
 using MV.DomainLayer.DTO.ResponseModels;
 
@@ -52,4 +53,9 @@ public interface IAuthService
     /// Đặt lại mật khẩu sau khi xác minh OTP
     /// </summary>
     Task<BaseResponseDto> ResetPasswordAsync(ResetPasswordRequestDto request);
+
+    /// <summary>
+    /// Upload avatar lên Cloudinary và cập nhật vào profile
+    /// </summary>
+    Task<ProfileResponseDto> UploadAvatarAsync(int userId, IFormFile file);
 }

@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using MV.ApplicationLayer.Interfaces;
@@ -22,19 +23,22 @@ public class AuthService : IAuthService
     private readonly IConfiguration _configuration;
     private readonly IPasswordResetTokenRepository _passwordResetTokenRepository;
     private readonly IEmailService _emailService;
+    private readonly ICloudinaryService _cloudinaryService;
 
     public AuthService(
         IUserRepository userRepository,
         IAdminRepository adminRepository,
         IConfiguration configuration,
         IPasswordResetTokenRepository passwordResetTokenRepository,
-        IEmailService emailService)
+        IEmailService emailService,
+        ICloudinaryService cloudinaryService)
     {
         _userRepository = userRepository;
         _adminRepository = adminRepository;
         _configuration = configuration;
         _passwordResetTokenRepository = passwordResetTokenRepository;
         _emailService = emailService;
+        _cloudinaryService = cloudinaryService;
     }
 
 
@@ -470,6 +474,73 @@ public class AuthService : IAuthService
         {
             Success = true,
             Message = "Đặt lại mật khẩu thành công"
+        };
+    }
+
+    /// <summary>
+    /// Upload avatar lên Cloudinary và cập nhật vào profile
+    /// </summary>
+    public async Task<ProfileResponseDto> UploadAvatarAsync(int userId, IFormFile file)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+
+        if (user == null)
+        {
+            return new ProfileResponseDto
+            {
+                Success = false,
+                Message = "Không tìm thấy người dùng"
+            };
+        }
+
+        // Validate file
+        if (file.Length == 0)
+        {
+            return new ProfileResponseDto
+            {
+                Success = false,
+                Message = "File ảnh không hợp lệ"
+            };
+        }
+
+        var allowedTypes = new[] { "image/jpeg", "image/png", "image/webp", "image/gif" };
+        if (!allowedTypes.Contains(file.ContentType.ToLower()))
+        {
+            return new ProfileResponseDto
+            {
+                Success = false,
+                Message = "Chỉ chấp nhận file ảnh (JPEG, PNG, WebP, GIF)"
+            };
+        }
+
+        // Upload lên Cloudinary
+        using var stream = file.OpenReadStream();
+        var avatarUrl = await _cloudinaryService.UploadImageAsync(stream, file.FileName, "scamazon/avatars");
+
+        // Cập nhật AvatarUrl trong DB
+        user.AvatarUrl = avatarUrl;
+        user.UpdatedAt = DateTime.UtcNow;
+        var updatedUser = await _userRepository.UpdateUserAsync(user);
+
+        return new ProfileResponseDto
+        {
+            Success = true,
+            Message = "Upload avatar thành công",
+            Data = new ProfileDataDto
+            {
+                Id = updatedUser.Id,
+                Username = updatedUser.Username,
+                Email = updatedUser.Email,
+                Phone = updatedUser.Phone,
+                FullName = updatedUser.FullName,
+                AvatarUrl = updatedUser.AvatarUrl,
+                Role = updatedUser.Role,
+                Address = updatedUser.Address,
+                City = updatedUser.City,
+                District = updatedUser.District,
+                Ward = updatedUser.Ward,
+                CreatedAt = updatedUser.CreatedAt
+            }
         };
     }
 }
