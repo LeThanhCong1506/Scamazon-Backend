@@ -8,4 +8,5 @@ public interface IPaymentService
     Task<VNPayResponseDto> CreateVNPayUrlAsync(int userId, VNPayRequestDto request, string ipAddress, string baseUrl);
     Task<BaseResponseDto> ProcessVNPayCallbackAsync(Dictionary<string, string> vnpayData);
     Task<PaymentStatusResponseDto> CheckPaymentStatusAsync(int userId, int orderId);
+    Task<BaseResponseDto> ProcessVNPayReturnAsync(Dictionary<string, string> vnpayData);
 }

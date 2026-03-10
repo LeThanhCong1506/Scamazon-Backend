@@ -7,7 +7,7 @@ using MV.DomainLayer.DTO.ResponseModels;
 namespace MV.PresentationLayer.Controllers;
 
 /// <summary>
-/// Controller cho Payment - SePay (QR chuyển khoản)
+/// Controller cho Payment - VNPay (redirect-based payment)
 /// </summary>
 [ApiController]
 [Route("api/payments")]
@@ -21,8 +21,8 @@ public class PaymentsController : ControllerBase
     }
 
     /// <summary>
-    /// Tạo QR Code thanh toán (SePay VietQR)
-    /// Trả về URL ảnh QR để mobile app hiển thị
+    /// Tạo URL thanh toán VNPay có ký HMAC-SHA512
+    /// Mobile app nhận URL này và mở trong WebView
     /// </summary>
     [HttpPost("create-qr")]
     [Authorize]
@@ -42,24 +42,43 @@ public class PaymentsController : ControllerBase
     }
 
     /// <summary>
-    /// SePay Webhook - nhận thông báo khi có giao dịch mới
-    /// SePay gọi POST JSON đến endpoint này
+    /// VNPay IPN (Instant Payment Notification)
+    /// VNPay server gọi endpoint này (GET với query params) sau khi giao dịch hoàn tất
+    /// Phải trả về { RspCode: "00", Message: "Confirm Success" } để VNPay ghi nhận thành công
     /// </summary>
-    [HttpPost("webhook/sepay")]
-    public async Task<IActionResult> SepayWebhook([FromBody] Dictionary<string, object> rawData)
+    [HttpGet("vnpay-ipn")]
+    public async Task<IActionResult> VnPayIpn()
     {
-        // Convert object values to strings for processing
-        var webhookData = rawData.ToDictionary(
+        var vnpayData = Request.Query.ToDictionary(
             kv => kv.Key,
-            kv => kv.Value?.ToString() ?? "");
+            kv => kv.Value.ToString());
 
-        var result = await _paymentService.ProcessVNPayCallbackAsync(webhookData);
+        var result = await _paymentService.ProcessVNPayCallbackAsync(vnpayData);
+
+        // VNPay yêu cầu response format cụ thể
+        var rspCode = result.Success ? "00" : (result.Message?.Length == 2 ? result.Message : "99");
+        return Ok(new { RspCode = rspCode, Message = result.Success ? "Confirm Success" : result.Message });
+    }
+
+    /// <summary>
+    /// VNPay Return URL - User được redirect về đây sau khi thanh toán trên trang VNPay
+    /// WebView của mobile app sẽ bắt URL này (detect vnp_ResponseCode trong query string)
+    /// Trả JSON để WebView đọc kết quả
+    /// </summary>
+    [HttpGet("vnpay-return")]
+    public async Task<IActionResult> VnPayReturn()
+    {
+        var vnpayData = Request.Query.ToDictionary(
+            kv => kv.Key,
+            kv => kv.Value.ToString());
+
+        var result = await _paymentService.ProcessVNPayReturnAsync(vnpayData);
         return Ok(result);
     }
 
     /// <summary>
-    /// Kiểm tra trạng thái thanh toán (Mobile app dùng polling)
-    /// Mobile app gọi mỗi 3-5 giây sau khi hiển thị QR để biết khi nào thanh toán xong
+    /// Kiểm tra trạng thái thanh toán (Mobile app dùng polling mỗi 3 giây)
+    /// Dùng song song với WebView để bắt kết quả từ IPN
     /// </summary>
     [HttpGet("status/{orderId}")]
     [Authorize]
