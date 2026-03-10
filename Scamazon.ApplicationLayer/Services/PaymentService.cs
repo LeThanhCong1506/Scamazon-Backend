@@ -1,7 +1,7 @@
-using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using MV.ApplicationLayer.Interfaces;
+using MV.ApplicationLayer.Utils;
 using MV.DomainLayer.DTO.RequestModels;
 using MV.DomainLayer.DTO.ResponseModels;
 using MV.InfrastructureLayer.Interfaces;
@@ -9,13 +9,14 @@ using MV.InfrastructureLayer.Interfaces;
 namespace MV.ApplicationLayer.Services;
 
 /// <summary>
-/// Payment Service - Tích hợp SePay (QR chuyển khoản + Webhook xác nhận)
-/// 
+/// Payment Service - Tích hợp VNPay (redirect-based payment + IPN webhook)
+///
 /// Luồng hoạt động:
-/// 1. User checkout → Backend tạo QR URL từ qr.sepay.vn (chứa thông tin bank, amount, nội dung CK)
-/// 2. Mobile app hiển thị QR → User quét bằng app ngân hàng và chuyển khoản
-/// 3. SePay nhận biến động số dư → gọi Webhook đến backend
-/// 4. Backend kiểm tra nội dung CK match order_code → xác nhận thanh toán
+/// 1. User checkout → Backend tạo URL thanh toán VNPay có ký HMAC-SHA512
+/// 2. Mobile app mở URL trong WebView → User thanh toán trên trang VNPay
+/// 3. VNPay redirect user về Return URL → WebView bắt vnp_ResponseCode
+/// 4. VNPay gửi IPN (Instant Payment Notification) đến backend
+/// 5. Backend xác thực chữ ký, cập nhật trạng thái thanh toán
 /// </summary>
 public class PaymentService : IPaymentService
 {
@@ -34,8 +35,8 @@ public class PaymentService : IPaymentService
     }
 
     /// <summary>
-    /// Tạo QR Code URL để thanh toán qua SePay (VietQR)
-    /// URL format: https://qr.sepay.vn/img?acc={ACCOUNT}&bank={BANK}&amount={AMOUNT}&des={CONTENT}
+    /// Tạo URL thanh toán VNPay với chữ ký HMAC-SHA512
+    /// URL sẽ được mở trong WebView của mobile app
     /// </summary>
     public async Task<VNPayResponseDto> CreateVNPayUrlAsync(int userId, VNPayRequestDto request, string ipAddress, string baseUrl)
     {
@@ -68,132 +69,156 @@ public class PaymentService : IPaymentService
             };
         }
 
-        // Đọc config SePay
-        var sepaySection = _configuration.GetSection("SePay");
-        var bankAccount = sepaySection["BankAccount"] ?? "";
-        var bankName = sepaySection["BankName"] ?? "MBBank";
-        var accountName = sepaySection["AccountName"] ?? "";
+        // Đọc config VNPay
+        var vnpaySection = _configuration.GetSection("VNPay");
+        var tmnCode = vnpaySection["TmnCode"] ?? "";
+        var hashSecret = vnpaySection["HashSecret"] ?? "";
+        var paymentUrl = vnpaySection["PaymentUrl"] ?? "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
+        var returnUrl = vnpaySection["ReturnUrl"] ?? $"{baseUrl}/api/payments/vnpay-return";
 
-        // Validate required config
-        if (string.IsNullOrWhiteSpace(bankAccount))
+        if (string.IsNullOrWhiteSpace(tmnCode) || string.IsNullOrWhiteSpace(hashSecret))
         {
             return new VNPayResponseDto
             {
                 Success = false,
-                Message = "Chưa cấu hình tài khoản ngân hàng (SePay:BankAccount). Vui lòng liên hệ admin."
+                Message = "Chưa cấu hình VNPay (TmnCode/HashSecret). Vui lòng liên hệ admin."
             };
         }
 
-        // Nội dung CK = order_code (để SePay webhook match)
-        var transferContent = payment.Order.OrderCode;
-        var amount = (long)payment.Amount;
+        // VNPay yêu cầu amount * 100 (không có phần thập phân)
+        var vnpAmount = (long)(payment.Amount * 100);
+        var vnpTxnRef = payment.Order.OrderCode; // Mã tham chiếu giao dịch = OrderCode
+        var vnpCreateDate = DateTime.Now.ToString("yyyyMMddHHmmss");
+        var vnpExpireDate = DateTime.Now.AddMinutes(15).ToString("yyyyMMddHHmmss");
 
-        // Tạo QR URL từ qr.sepay.vn
-        var qrUrl = $"https://qr.sepay.vn/img?acc={bankAccount}&bank={bankName}&amount={amount}&des={Uri.EscapeDataString(transferContent)}";
+        // Build tham số theo thứ tự alphabet (SortedList tự sort)
+        var vnpParams = new SortedList<string, string>
+        {
+            { "vnp_Version", vnpaySection["Version"] ?? "2.1.0" },
+            { "vnp_Command", vnpaySection["Command"] ?? "pay" },
+            { "vnp_TmnCode", tmnCode },
+            { "vnp_Amount", vnpAmount.ToString() },
+            { "vnp_CreateDate", vnpCreateDate },
+            { "vnp_CurrCode", vnpaySection["CurrCode"] ?? "VND" },
+            { "vnp_IpAddr", string.IsNullOrWhiteSpace(ipAddress) ? "127.0.0.1" : ipAddress },
+            { "vnp_Locale", vnpaySection["Locale"] ?? "vn" },
+            { "vnp_OrderInfo", $"Thanh toan don hang {vnpTxnRef}" },
+            { "vnp_OrderType", vnpaySection["OrderType"] ?? "other" },
+            { "vnp_ReturnUrl", returnUrl },
+            { "vnp_TxnRef", vnpTxnRef },
+            { "vnp_ExpireDate", vnpExpireDate }
+        };
 
-        // Cập nhật transaction ID = order_code
-        payment.TransactionId = transferContent;
+        var signedUrl = VnPayHelper.CreatePaymentUrl(vnpParams, paymentUrl, hashSecret);
+
+        // Lưu transaction ID = OrderCode để match khi IPN về
+        payment.TransactionId = vnpTxnRef;
         await _paymentRepository.UpdatePaymentAsync(payment);
 
         return new VNPayResponseDto
         {
             Success = true,
-            Message = "Tạo mã QR thanh toán thành công",
+            Message = "Tạo URL thanh toán VNPay thành công",
             Data = new VNPayDataDto
             {
-                PaymentUrl = qrUrl
+                PaymentUrl = signedUrl
             }
         };
     }
 
     /// <summary>
-    /// Xử lý Webhook từ SePay khi có giao dịch mới
-    /// SePay gửi POST JSON:
-    /// {
-    ///   "id": 123,
-    ///   "gateway": "MBBank",
-    ///   "transactionDate": "2024-01-01 12:00:00",
-    ///   "accountNumber": "0123456789",
-    ///   "transferType": "in",
-    ///   "transferAmount": 150000,
-    ///   "accumulated": 500000,
-    ///   "code": null,
-    ///   "content": "SCM202401011200001234",
-    ///   "referenceCode": "FT123456",
-    ///   "description": "..."
-    /// }
+    /// Xử lý IPN (Instant Payment Notification) từ VNPay
+    /// VNPay gọi endpoint này sau khi giao dịch hoàn tất (GET với query params)
+    /// Phải trả về { RspCode: "00", Message: "Confirm Success" } để VNPay ghi nhận
     /// </summary>
-    public async Task<BaseResponseDto> ProcessVNPayCallbackAsync(Dictionary<string, string> webhookData)
+    public async Task<BaseResponseDto> ProcessVNPayCallbackAsync(Dictionary<string, string> vnpayData)
     {
-        // 1. Lấy nội dung chuyển khoản (chính là order_code)
-        var content = webhookData.GetValueOrDefault("content", "");
-        var amountStr = webhookData.GetValueOrDefault("transferAmount", "0");
-        var transferType = webhookData.GetValueOrDefault("transferType", "");
-
-        // Chỉ xử lý giao dịch tiền vào
-        if (transferType != "in")
+        // 1. Xác thực chữ ký HMAC-SHA512
+        var hashSecret = _configuration.GetSection("VNPay")["HashSecret"] ?? "";
+        if (!VnPayHelper.ValidateSignature(vnpayData, hashSecret))
         {
-            return new BaseResponseDto { Success = true, Message = "Ignored: not incoming transfer" };
+            return new BaseResponseDto { Success = false, Message = "97" }; // VNPay error code: invalid signature
         }
 
-        if (string.IsNullOrEmpty(content))
-        {
-            return new BaseResponseDto { Success = false, Message = "Missing transfer content" };
-        }
+        // 2. Lấy các thông tin chính
+        var responseCode = vnpayData.GetValueOrDefault("vnp_ResponseCode", "");
+        var transactionStatus = vnpayData.GetValueOrDefault("vnp_TransactionStatus", "");
+        var txnRef = vnpayData.GetValueOrDefault("vnp_TxnRef", "");
+        var vnpAmountStr = vnpayData.GetValueOrDefault("vnp_Amount", "0");
 
-        // 2. Tìm order_code trong nội dung CK
-        // Nội dung CK có thể chứa text thêm từ ngân hàng, nên ta tìm order_code pattern
-        var payment = await _paymentRepository.GetByTransactionIdAsync(content.Trim());
-
-        // Nếu không tìm thấy chính xác, thử tìm order_code pattern "SCM..." trong content bằng Regex
+        // 3. Tìm payment theo OrderCode (= vnp_TxnRef)
+        var payment = await _paymentRepository.GetByTransactionIdAsync(txnRef);
         if (payment == null)
         {
-            // Sử dụng Regex để tìm chuỗi bắt đầu bằng SCM và theo sau là các chữ số
-            var match = System.Text.RegularExpressions.Regex.Match(content, @"SCM\d+", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (match.Success)
-            {
-                payment = await _paymentRepository.GetByTransactionIdAsync(match.Value);
-            }
+            return new BaseResponseDto { Success = false, Message = "01" }; // VNPay error code: order not found
         }
 
-        if (payment == null)
-        {
-            return new BaseResponseDto { Success = false, Message = "Không tìm thấy đơn hàng tương ứng" };
-        }
-
+        // 4. Idempotency: đã xác nhận trước đó
         if (payment.Status == "success")
         {
-            return new BaseResponseDto { Success = true, Message = "Đơn hàng đã được xác nhận trước đó" };
+            return new BaseResponseDto { Success = true, Message = "00" }; // Already confirmed
         }
 
-        // 3. Kiểm tra số tiền
-        if (decimal.TryParse(amountStr, out var transferAmount))
+        // 5. Kiểm tra số tiền (VNPay gửi amount * 100)
+        if (long.TryParse(vnpAmountStr, out var vnpAmount))
         {
-            if (transferAmount < payment.Amount)
+            var expectedAmount = (long)(payment.Amount * 100);
+            if (vnpAmount != expectedAmount)
             {
-                return new BaseResponseDto
-                {
-                    Success = false,
-                    Message = $"Số tiền chuyển ({transferAmount:N0}) nhỏ hơn tổng đơn hàng ({payment.Amount:N0})"
-                };
+                return new BaseResponseDto { Success = false, Message = "04" }; // VNPay error code: amount invalid
             }
         }
 
-        // 4. Xác nhận thanh toán thành công
-        payment.Status = "success";
-        payment.PaidAt = DateTime.UtcNow;
-        payment.PaymentData = JsonSerializer.Serialize(webhookData);
-        await _paymentRepository.UpdatePaymentAsync(payment);
+        // 6. Kiểm tra kết quả giao dịch
+        if (responseCode == "00" && transactionStatus == "00")
+        {
+            // Thanh toán thành công
+            payment.Status = "success";
+            payment.PaidAt = DateTime.UtcNow;
+            payment.PaymentData = JsonSerializer.Serialize(vnpayData);
+            await _paymentRepository.UpdatePaymentAsync(payment);
 
-        // 5. Cập nhật trạng thái order → confirmed
-        await _orderRepository.UpdateOrderStatusAsync(payment.OrderId, "confirmed");
+            await _orderRepository.UpdateOrderStatusAsync(payment.OrderId, "confirmed");
 
-        return new BaseResponseDto { Success = true, Message = "Thanh toán thành công" };
+            return new BaseResponseDto { Success = true, Message = "Thanh toán thành công" };
+        }
+        else
+        {
+            // Thanh toán thất bại hoặc bị hủy
+            payment.Status = "failed";
+            payment.PaymentData = JsonSerializer.Serialize(vnpayData);
+            await _paymentRepository.UpdatePaymentAsync(payment);
+
+            return new BaseResponseDto { Success = false, Message = $"Thanh toán thất bại: {responseCode}" };
+        }
     }
 
     /// <summary>
-    /// Kiểm tra trạng thái thanh toán - Mobile app dùng polling
-    /// Gọi định kỳ (mỗi 3-5s) sau khi hiển thị QR để biết khi nào thanh toán xong
+    /// Xử lý Return URL từ VNPay - user được redirect về sau khi thanh toán
+    /// Chỉ xác thực chữ ký và trả kết quả, KHÔNG cập nhật DB (để IPN xử lý)
+    /// Trả JSON để WebView của mobile app đọc và điều hướng
+    /// </summary>
+    public async Task<BaseResponseDto> ProcessVNPayReturnAsync(Dictionary<string, string> vnpayData)
+    {
+        var hashSecret = _configuration.GetSection("VNPay")["HashSecret"] ?? "";
+        if (!VnPayHelper.ValidateSignature(vnpayData, hashSecret))
+        {
+            return new BaseResponseDto { Success = false, Message = "Chữ ký không hợp lệ" };
+        }
+
+        var responseCode = vnpayData.GetValueOrDefault("vnp_ResponseCode", "");
+        var txnRef = vnpayData.GetValueOrDefault("vnp_TxnRef", "");
+
+        if (responseCode == "00")
+        {
+            return new BaseResponseDto { Success = true, Message = "Thanh toán thành công" };
+        }
+
+        return new BaseResponseDto { Success = false, Message = $"Thanh toán thất bại hoặc bị hủy (code: {responseCode})" };
+    }
+
+    /// <summary>
+    /// Kiểm tra trạng thái thanh toán - Mobile app dùng polling mỗi 3 giây
     /// </summary>
     public async Task<PaymentStatusResponseDto> CheckPaymentStatusAsync(int userId, int orderId)
     {
@@ -208,7 +233,6 @@ public class PaymentService : IPaymentService
             };
         }
 
-        // Kiểm tra quyền sở hữu
         if (payment.Order.UserId != userId)
         {
             return new PaymentStatusResponseDto
