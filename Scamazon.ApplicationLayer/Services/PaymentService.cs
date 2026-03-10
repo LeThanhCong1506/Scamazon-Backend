@@ -215,6 +215,18 @@ public class PaymentService : IPaymentService
 
         if (responseCode == "00")
         {
+            // Update DB on Return URL (idempotent setup, also protects against missing IPN loop)
+            var payment = await _paymentRepository.GetByTransactionIdAsync(txnRef);
+            if (payment != null && payment.Status != "success")
+            {
+                payment.Status = "success";
+                payment.PaidAt = DateTime.UtcNow;
+                payment.PaymentData = JsonSerializer.Serialize(vnpayData);
+                await _paymentRepository.UpdatePaymentAsync(payment);
+
+                await _orderRepository.UpdateOrderStatusAsync(payment.OrderId, "confirmed");
+            }
+
             return new BaseResponseDto { Success = true, Message = "Thanh toán thành công" };
         }
 
