@@ -88,8 +88,12 @@ public class PaymentService : IPaymentService
         // VNPay yêu cầu amount * 100 (không có phần thập phân)
         var vnpAmount = (long)(payment.Amount * 100);
         var vnpTxnRef = payment.Order.OrderCode; // Mã tham chiếu giao dịch = OrderCode
-        var vnpCreateDate = DateTime.Now.ToString("yyyyMMddHHmmss");
-        var vnpExpireDate = DateTime.Now.AddMinutes(15).ToString("yyyyMMddHHmmss");
+        
+        // VNPay yêu cầu timestamp theo giờ Việt Nam (UTC+7)
+        // Trên server Render (UTC), DateTime.Now sẽ trả về giờ UTC → VNPay sẽ thấy đã hết hạn
+        var vietnamNow = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(7));
+        var vnpCreateDate = vietnamNow.ToString("yyyyMMddHHmmss");
+        var vnpExpireDate = vietnamNow.AddMinutes(15).ToString("yyyyMMddHHmmss");
 
         // Build tham số theo thứ tự alphabet (SortedList tự sort)
         var vnpParams = new SortedList<string, string>
