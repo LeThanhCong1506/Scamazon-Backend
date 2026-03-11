@@ -259,8 +259,8 @@ namespace MV.PresentationLayer
                 app.UseHttpsRedirection();
             }
 
-            // Health check endpoint cho Render
-            app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+            // Health check endpoint cho Render và UptimeRobot (hỗ trợ cả GET và HEAD)
+            app.MapMethods("/health", new[] { "GET", "HEAD" }, () => Results.Ok(new { status = "healthy" }));
 
             // Serve static files (uploads)
             app.UseStaticFiles();
