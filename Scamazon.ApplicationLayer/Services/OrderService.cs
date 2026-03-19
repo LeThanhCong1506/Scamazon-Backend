@@ -192,7 +192,8 @@ public class OrderService : IOrderService
             Status = o.Status,
             ItemCount = o.OrderItems.Count,
             FirstProductImage = o.OrderItems.FirstOrDefault()?.ProductImage,
-            CreatedAt = o.CreatedAt
+            CreatedAt = o.CreatedAt,
+            PaymentMethod = o.Payments.FirstOrDefault()?.PaymentMethod
         }).ToList();
 
         return new OrderListResponseDto
