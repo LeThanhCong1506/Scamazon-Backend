@@ -74,6 +74,7 @@ public class OrderSummaryDto
     public int ItemCount { get; set; }
     public string? FirstProductImage { get; set; }
     public DateTime? CreatedAt { get; set; }
+    public string? PaymentMethod { get; set; }
 }
 
 /// <summary>
